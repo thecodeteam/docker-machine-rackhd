@@ -1,11 +1,12 @@
 package rackhd
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"strconv"
+	"strings"
 
 	apiclient "github.com/emccode/gorackhd/client"
 	"github.com/emccode/gorackhd/client/lookups"
@@ -15,9 +16,11 @@ import (
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnflag"
-	"github.com/docker/machine/libmachine/mcnutils"
+	//"github.com/docker/machine/libmachine/mcnutils"
 	"github.com/docker/machine/libmachine/ssh"
 	"github.com/docker/machine/libmachine/state"
+
+	cryptossh "golang.org/x/crypto/ssh"
 )
 
 type Driver struct {
@@ -33,7 +36,7 @@ type Driver struct {
 }
 
 const (
-	defaultEndpoint    = "localhost:9090"
+	defaultEndpoint    = "localhost:8080"
 	defaultTransport   = "http"
 	defaultSSHUser     = "root"
 	defaultSSHPassword = "root"
@@ -185,7 +188,7 @@ func (d *Driver) Create() error {
 			log.Debugf("Connection failed on: %v", ipPort)
 		} else {
 			log.Infof("Connection succeeded on: %v", ipPort)
-			d.IPAddress = ipAddy
+			d.IPAddress = string(ipAddy)
 			conn.Close()
 			break
 		}
@@ -201,25 +204,48 @@ func (d *Driver) Create() error {
 	if err != nil {
 		return err
 	}
-	d.SSHKey = key
-	log.Debugf("Created SSH Key ID: %v", key)
+
+	d.SSHKey = strings.TrimSpace(key)
 
 	/*
-		TAKEN FROM THE GENERIC DRIVER
-	*/
-	if d.SSHKey == "" {
-		log.Info("No SSH key specified. Connecting to this machine now and in the" +
-			" future will require the ssh agent to contain the appropriate key.")
-	} else {
+			TAKEN FROM THE GENERIC DRIVER
+
+
 		log.Info("Importing SSH key...")
 		// TODO: validate the key is a valid key
-		if err := mcnutils.CopyFile(d.SSHKey, d.GetSSHKeyPath()); err != nil {
+		if err :=
+		 mcnutils.CopyFile(d.SSHKey, d.GetSSHKeyPath()); err != nil {
 			return fmt.Errorf("unable to copy ssh key: %s", err)
 		}
 
 		if err := os.Chmod(d.GetSSHKeyPath(), 0600); err != nil {
 			return fmt.Errorf("unable to set permissions on the ssh key: %s", err)
 		}
+	*/
+
+	/*
+		TAKEN FROM THE FUSION DRIVER TO USE SSH
+	*/
+
+	log.Infof("Copy public SSH key to %s [%s]", d.MachineName, d.IPAddress)
+	for {
+		// create .ssh folder in users home
+		if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
+			return err
+		}
+		/*************************************************************************/
+		/* THIS DIES HERE SAYING "unexpected EOF" INSTEAD OF WAITING FOR TIMEOUT */
+		/*************************************************************************/
+		// add public ssh key to authorized_keys
+		if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", d.SSHKey, d.SSHUser), d); err != nil {
+			return err
+		}
+
+		// make it secure
+		if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.SSHUser), d); err != nil {
+			return err
+		}
+		break
 	}
 
 	return nil
@@ -246,18 +272,6 @@ func (d *Driver) createSSHKey() (string, error) {
 		return "", err
 	}
 
-	/*createRequest := &goubi.AddKeyParams{
-		KeyName: d.MachineName,
-		PubKey:  string(publicKey),
-	}
-
-	key, err := d.getClient().CreateSSHKey(d.MachineName, string(publicKey))
-	if err != nil {
-		return &key, err
-	}
-	return &key, nil
-
-	return key, nil*/
 	return string(publicKey), nil
 }
 
@@ -331,4 +345,40 @@ func (d *Driver) getClient() *apiclient.Monorail {
 
 func (d *Driver) publicSSHKeyPath() string {
 	return d.GetSSHKeyPath() + ".pub"
+}
+
+// execute command over SSH with user / password authentication
+func executeSSHCommand(command string, d *Driver) error {
+	log.Debugf("Execute executeSSHCommand: %s", command)
+
+	config := &cryptossh.ClientConfig{
+		User: d.SSHUser,
+		Auth: []cryptossh.AuthMethod{
+			cryptossh.Password(d.SSHPassword),
+		},
+	}
+
+	client, err := cryptossh.Dial("tcp", fmt.Sprintf("%s:%d", d.IPAddress, d.SSHPort), config)
+	if err != nil {
+		log.Debugf("Failed to dial:", err)
+		return err
+	}
+
+	session, err := client.NewSession()
+	if err != nil {
+		log.Debugf("Failed to create session: " + err.Error())
+		return err
+	}
+	defer session.Close()
+
+	var b bytes.Buffer
+	session.Stdout = &b
+
+	if err := session.Run(command); err != nil {
+		log.Debugf("Failed to run: " + err.Error())
+		return err
+	}
+	log.Debugf("Stdout from executeSSHCommand: %s", b.String())
+
+	return nil
 }

@@ -10,6 +10,7 @@ import (
 
 	apiclient "github.com/emccode/gorackhd/client"
 	"github.com/emccode/gorackhd/client/lookups"
+
 	httptransport "github.com/go-swagger/go-swagger/httpkit/client"
 	"github.com/go-swagger/go-swagger/strfmt"
 
@@ -27,7 +28,7 @@ type Driver struct {
 	*drivers.BaseDriver
 	Endpoint    string
 	NodeID      string
-	SSHUsername string
+	SSHUser     string
 	SSHPassword string
 	SSHPort     int
 	SSHKey      string
@@ -65,7 +66,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_USER",
 			Name:   "rackhd-ssh-user",
-			Usage:  "ssh username (default:root)",
+			Usage:  "ssh user (default:root)",
 			Value:  defaultSSHUser,
 		},
 		mcnflag.StringFlag{
@@ -137,7 +138,7 @@ func (d *Driver) PreCreateCheck() error {
 	client := d.getClient()
 
 	//do a test to see if the server is available
-	_, err := client.Config.GetConfig(nil)
+	_, err := client.Config.GetConfig(nil, nil)
 	if err != nil {
 		/* THIS ERROR IS NOT OUTPUT CORRECTLY. IT SAYS "unexpected EOF" */
 		return fmt.Errorf("The Endpoint is not accessible. Error: %s", err)
@@ -151,7 +152,7 @@ func (d *Driver) Create() error {
 	client := d.getClient()
 
 	// do a lookup on the ID
-	resp, err := client.Lookups.GetLookupsID(&lookups.GetLookupsIDParams{ID: "?q=" + d.NodeID})
+	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)
 	if err != nil {
 		return err
 	}
@@ -181,9 +182,6 @@ func (d *Driver) Create() error {
 		ipPort := ipAddy + ":" + strconv.Itoa(d.SSHPort)
 		log.Debugf("Testing connection to: %v", ipPort)
 		conn, err := net.DialTimeout("tcp", ipPort, 25000000000)
-		/*************************************************************************/
-		/* THIS DIES HERE SAYING "unexpected EOF" INSTEAD OF WAITING FOR TIMEOUT */
-		/*************************************************************************/
 		if err != nil {
 			log.Debugf("Connection failed on: %v", ipPort)
 		} else {
@@ -198,54 +196,31 @@ func (d *Driver) Create() error {
 		return fmt.Errorf("No IP addresses are accessible on this network to the Node ID specified. Error: %s", err)
 	}
 
-	//create public SSH key - MAYBE NOT NECESSARY??
+	//create public SSH key
 	log.Infof("Creating SSH key...")
 	key, err := d.createSSHKey()
 	if err != nil {
 		return err
 	}
-
 	d.SSHKey = strings.TrimSpace(key)
 
-	/*
-			TAKEN FROM THE GENERIC DRIVER
-
-
-		log.Info("Importing SSH key...")
-		// TODO: validate the key is a valid key
-		if err :=
-		 mcnutils.CopyFile(d.SSHKey, d.GetSSHKeyPath()); err != nil {
-			return fmt.Errorf("unable to copy ssh key: %s", err)
-		}
-
-		if err := os.Chmod(d.GetSSHKeyPath(), 0600); err != nil {
-			return fmt.Errorf("unable to set permissions on the ssh key: %s", err)
-		}
-	*/
-
-	/*
-		TAKEN FROM THE FUSION DRIVER TO USE SSH
-	*/
-
+	//TAKEN FROM THE FUSION DRIVER TO USE SSH
 	log.Infof("Copy public SSH key to %s [%s]", d.MachineName, d.IPAddress)
-	for {
-		// create .ssh folder in users home
-		if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
-			return err
-		}
-		/*************************************************************************/
-		/* THIS DIES HERE SAYING "unexpected EOF" INSTEAD OF WAITING FOR TIMEOUT */
-		/*************************************************************************/
-		// add public ssh key to authorized_keys
-		if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", d.SSHKey, d.SSHUser), d); err != nil {
-			return err
-		}
-
-		// make it secure
-		if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.SSHUser), d); err != nil {
-			return err
-		}
-		break
+	// create .ssh folder in users home
+	if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
+		return err
+	}
+	// add public ssh key to authorized_keys
+	if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", d.SSHKey, d.SSHUser), d); err != nil {
+		return err
+	}
+	// make it secure
+	if err := executeSSHCommand(fmt.Sprintf("chmod 700 /home/%s/.ssh", d.SSHUser), d); err != nil {
+		return err
+	}
+	// make it secure
+	if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.SSHUser), d); err != nil {
+		return err
 	}
 
 	return nil
@@ -294,7 +269,15 @@ func (d *Driver) GetState() (state.State, error) {
 	/*
 		TODO
 	*/
+	/*switch instance.State {
+	case "online":
+		return state.Running, nil
+	case "offline":
+		return state.Stopped, nil
+	}
 	return state.None, nil
+	*/
+	return state.Running, nil
 }
 
 func (d *Driver) Start() error {

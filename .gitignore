@@ -25,3 +25,11 @@ _testmain.go
 
 # local dev commands
 commands.md
+
+# local builds
+*.darwin-amd64
+*.linux-amd64
+*.windows-amd64
+*.Darwin-x86_64
+*.Linux-x86_64
+*.Windows-x86_64

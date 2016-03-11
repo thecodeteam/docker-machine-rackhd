@@ -17,7 +17,6 @@ import (
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnflag"
-	//"github.com/docker/machine/libmachine/mcnutils"
 	"github.com/docker/machine/libmachine/ssh"
 	"github.com/docker/machine/libmachine/state"
 
@@ -81,12 +80,26 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "ssh port (default:22)",
 			Value:  defaultSSHPort,
 		},
-		/* TODO: Grab SSH User and PW from Workflow.
-		mcnflag.StringFlag{
-			EnvVar: "RACKHD_WORKFLOW_ID",
-			Name:   "rackhd-workflow-id",
-			Usage:  "workflow ID used to extract SSH user information (optional)",
-		},*/
+		/*
+			TODO: Grab SSH User and PW from Workflow.
+			mcnflag.StringFlag{
+				EnvVar: "RACKHD_WORKFLOW_ID",
+				Name:   "rackhd-workflow-id",
+				Usage:  "workflow ID used to extract SSH user information (optional)",
+			},
+			TODO: Implicit creation from a pool
+			mcnflag.StringFlag{
+				EnvVar: "RACKHD_POOL_ID",
+				Name:   "rackhd-POOL-id",
+				Usage:  "POOL ID",
+			},
+			TODO: API Authentication Values. Will be detemined for v 2.0 of API
+			mcnflag.StringFlag{
+				EnvVar: "RACKHD_ENDPOINT_AUTH",
+				Name:   "rackhd-ENDPOINT_AUTH,
+				Usage:  "ENDPOINT_AUTH",
+			},
+		*/
 	}
 }
 
@@ -137,10 +150,10 @@ func (d *Driver) PreCreateCheck() error {
 	//Generate the client
 	client := d.getClient()
 
-	//do a test to see if the server is available
+	//do a test to see if the server is available. 2nd Nil is authentication params
+	// that need to be determined in v2.0 of API
 	_, err := client.Config.GetConfig(nil, nil)
 	if err != nil {
-		/* THIS ERROR IS NOT OUTPUT CORRECTLY. IT SAYS "unexpected EOF" */
 		return fmt.Errorf("The Endpoint is not accessible. Error: %s", err)
 	}
 	log.Infof("Test Passed. %v is accessbile and installation will begin", d.Endpoint)
@@ -151,7 +164,7 @@ func (d *Driver) Create() error {
 	//Generate the client
 	client := d.getClient()
 
-	// do a lookup on the ID
+	// do a lookup on the ID to retrieve IP information
 	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)
 	if err != nil {
 		return err
@@ -177,7 +190,7 @@ func (d *Driver) Create() error {
 		return fmt.Errorf("No IP addresses are associated with the Node ID specified. Error: %s", err)
 	}
 
-	// loop through slice and see if we can connect to the ip:port
+	// loop through slice and see if we can connect to the ip:ssh-port
 	for _, ipAddy := range ipAddSlice {
 		ipPort := ipAddy + ":" + strconv.Itoa(d.SSHPort)
 		log.Debugf("Testing connection to: %v", ipPort)
@@ -204,7 +217,7 @@ func (d *Driver) Create() error {
 	}
 	d.SSHKey = strings.TrimSpace(key)
 
-	//TAKEN FROM THE FUSION DRIVER TO USE SSH
+	//TAKEN FROM THE FUSION DRIVER TO USE SSH [THANKS!]
 	log.Infof("Copy public SSH key to %s [%s]", d.MachineName, d.IPAddress)
 	// create .ssh folder in users home
 	if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
@@ -267,50 +280,56 @@ func (d *Driver) GetIP() (string, error) {
 
 func (d *Driver) GetState() (state.State, error) {
 	/*
-		TODO
-	*/
-	/*switch instance.State {
-	case "online":
-		return state.Running, nil
-	case "offline":
-		return state.Stopped, nil
-	}
-	return state.None, nil
+		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
+		switch instance.State {
+		case "online":
+			return state.Running, nil
+		case "offline":
+			return state.Stopped, nil
+		}
+		return state.None, nil
 	*/
 	return state.Running, nil
 }
 
 func (d *Driver) Start() error {
 	/*
-		TODO
+		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
+		REMOTELY POWER ON A SERVER VIA IPMI
 	*/
 	return nil
 }
 
 func (d *Driver) Stop() error {
 	/*
-		TODO
+		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
+		SEND A SIGKILL TO THE OS. OR USE THE API TO GRACEFULLY SHUTDOWN THE HOST
 	*/
 	return nil
 }
 
 func (d *Driver) Remove() error {
 	/*
-		TODO
+		TODO: DECIDE WHETHER TO UNINSTALL DOCKER OR
+		1. ADD A GENERIC WORKFLOW
+		2. REBOOT THE HOST
+		3. HOPE THAT GENERIC WORKFLOW WILL RESET THE HOST BACK TO A BLANK SLATE
 	*/
 	return nil
 }
 
 func (d *Driver) Restart() error {
 	/*
-		TODO
+		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
+		REMOTELY RESET OFF A SERVER VIA IPMI
 	*/
 	return nil
 }
 
 func (d *Driver) Kill() error {
 	/*
-		TODO
+		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
+		POWER OFF THE HOST VIA IMPI
 	*/
 	return nil
 }
@@ -319,6 +338,7 @@ func (d *Driver) getClient() *apiclient.Monorail {
 	log.Debugf("Getting RackHD Client")
 	if d.client == nil {
 		// create the transport
+		/** Will Need to determine changes for v 2.0 API **/
 		transport := httptransport.New(d.Endpoint, "/api/1.1", []string{d.Transport})
 		// create the API client, with the transport
 		d.client = apiclient.New(transport, strfmt.Default)

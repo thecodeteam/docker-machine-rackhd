@@ -1,6 +1,6 @@
-# RackHD Driver for Docker Machine
+# Docker Machine Driver for RackHD
 
-Create Docker hosts with [RackHD](https://github.com/RackHD/RackHD).
+Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD).
 
 ## Installation
 
@@ -19,16 +19,16 @@ $ docker-machine -v
 docker-machine version 0.5.1 (7e8e38e)
 ```
 
-Check that `docker-machine` can see the RackHD driver by asking for the driver help.
+Verify `docker-machine` can access the RackHD driver by issuing the `--help` or ` | more` flags. A list of RackHD options will be displayed on the menu.
 
 ```
 $ docker-machine create -d rackhd | more
 Usage: docker-machine create [OPTIONS] [arg...]
 ```
 
-## Create a machine.
+## Create a Machine
 
-Specify a driver with `--driver` or `-d` to include the create flags for that driver in the help text.
+Specify `rackhd` as the driver with `--driver` or `-d` create flags then accompany it with any of the following options as additional parameters.
 
 Options:
 
@@ -43,7 +43,7 @@ Options:
 
 This initial version of the driver uses explicit creation instructions. The user must specify the Node ID from RackHD. The NodeID is characterized as a `compute` instance. Do not use `enclosure`.
 
-Create a Docker host using the following example. The client assumes you are using a Vagant instance. Note at this time, it will fail because the nodes being PXE booted via Vagrant do not have SSH access. SSH access is possible by creating an additional NIC, but RackHD doesn't have the capability to get the IP Address and add it to its own database if it didn't give the IP. This will work best using physical hardware and a network where Docker Machine has  access to the DHCP network of RackHD
+Create a Docker host using the following example. This will function as expected if Docker Machine has access to the DHCP network of RackHD.
 
 ```
 $ docker-machine create -d rackhd --rackhd-node-id 56c61189f21f01b608b3e594 rackhdtest
@@ -62,13 +62,12 @@ Provisioning with centos...
 Copying certs to the local machine directory...
 Copying certs to the remote machine...
 Setting Docker configuration on the remote daemon...
-Configuring swarm...
 Checking connection to Docker...
 Docker is up and running!
 To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: docker-machine env rackhdtest
 ```
 
-Checkout the [RackHD Vagrant + Docker Machine Example](https://github.com/emccode/machine/tree/master/rackhd) to get a complete in-depth configuration and walk-through.
+Check out the [RackHD Vagrant + Docker Machine Example](https://github.com/emccode/machine/tree/master/rackhd) to view a complete in-depth configuration and walk-through.
 
 # Licensing
 Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License. You may obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>

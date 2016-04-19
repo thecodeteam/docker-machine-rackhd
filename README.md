@@ -1,12 +1,12 @@
 # Docker Machine Driver for RackHD
 
-Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD).
+Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and [Docker Swarm](https://github.com/docker/swarm).
 
 ## Installation
 
 **Linux & Mac OSX**:
 ```
-curl -L https://github.com/emccode/docker-machine-rackhd/releases/download/v0.0.1/docker-machine-driver-rackhd.`uname -s`-`uname -m` >/usr/local/bin/docker-machine-driver-rackhd &&  chmod +x /usr/local/bin/docker-machine-driver-rackhd
+curl -L https://github.com/emccode/docker-machine-rackhd/releases/download/v0.1.0/docker-machine-driver-rackhd.`uname -s`-`uname -m` >/usr/local/bin/docker-machine-driver-rackhd &&  chmod +x /usr/local/bin/docker-machine-driver-rackhd
 ```
 
 ## Using the driver
@@ -41,7 +41,7 @@ Options:
 | --rackhd-ssh-password     |   RACKHD_SSH_PASSWORD   |    root   | SSH Password for the node               |     N      |
 | --rackhd-ssh-port      |    RACKHD_SSH_PORT   |    22    | SSH Port for the node          |      N     |
 
-This initial version of the driver uses explicit creation instructions. The user must specify the Node ID from RackHD. The NodeID is characterized as a `compute` instance. Do not use `enclosure`.
+This initial version of the driver uses explicit instructions. The user must specify the Node ID from RackHD. The NodeID is characterized as a `compute` instance. Do not use `enclosure`.
 
 Create a Docker host using the following example. This will function as expected if Docker Machine has access to the DHCP network of RackHD.
 
@@ -49,7 +49,7 @@ Create a Docker host using the following example. This will function as expected
 $ docker-machine create -d rackhd --rackhd-node-id 56c61189f21f01b608b3e594 rackhdtest
 Running pre-create checks...
 (rackhdtest) Testing accessibility of endpoint: localhost:8080
-(rackhdtest) Test Passed. localhost:8080 is accessbile and installation will begin
+(rackhdtest) Test Passed. localhost:8080 Monorail and Redfish API's are accessible and installation will begin
 Creating machine...
 (rackhdtest) Connection succeeded on: 172.31.128.16:22
 (rackhdtest) Creating SSH key...
@@ -68,6 +68,10 @@ To see how to connect your Docker Client to the Docker Engine running on this vi
 ```
 
 Check out the [RackHD Vagrant + Docker Machine Example](https://github.com/emccode/machine/tree/master/rackhd) to view a complete in-depth configuration and walk-through.
+
+## Other Machine Functions
+
+The other functions for **Start**, **Stop**, **Restart**, **Kill**, and **Remove** require the use of IPMI. This must be configured in RackHD.
 
 # Licensing
 Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License. You may obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>

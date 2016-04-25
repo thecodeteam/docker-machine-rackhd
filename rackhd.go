@@ -8,8 +8,12 @@ import (
 	"strconv"
 	"strings"
 
-	apiclient "github.com/emccode/gorackhd/client"
+	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
+	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
+	modelsRedfish "github.com/emccode/gorackhd-redfish/models"
+	apiclientMonorail "github.com/emccode/gorackhd/client"
 	"github.com/emccode/gorackhd/client/lookups"
+	"github.com/emccode/gorackhd/client/nodes"
 
 	httptransport "github.com/go-swagger/go-swagger/httpkit/client"
 	"github.com/go-swagger/go-swagger/strfmt"
@@ -25,14 +29,15 @@ import (
 
 type Driver struct {
 	*drivers.BaseDriver
-	Endpoint    string
-	NodeID      string
-	SSHUser     string
-	SSHPassword string
-	SSHPort     int
-	SSHKey      string
-	Transport   string
-	client      *apiclient.Monorail
+	Endpoint       string
+	NodeID         string
+	SSHUser        string
+	SSHPassword    string
+	SSHPort        int
+	SSHKey         string
+	Transport      string
+	clientMonorail *apiclientMonorail.Monorail
+	clientRedfish  *apiclientRedfish.Redfish
 }
 
 const (
@@ -148,21 +153,27 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 func (d *Driver) PreCreateCheck() error {
 	log.Infof("Testing accessibility of endpoint: %v", d.Endpoint)
 	//Generate the client
-	client := d.getClient()
-
+	clientMonorail := d.getClientMonorail()
 	//do a test to see if the server is available. 2nd Nil is authentication params
-	// that need to be determined in v2.0 of API
-	_, err := client.Config.GetConfig(nil, nil)
+	_, err := clientMonorail.Config.GetConfig(nil, nil)
 	if err != nil {
-		return fmt.Errorf("The Endpoint is not accessible. Error: %s", err)
+		return fmt.Errorf("The Monorail API Endpoint is not accessible. Error: %s", err)
 	}
-	log.Infof("Test Passed. %v is accessbile and installation will begin", d.Endpoint)
+
+	clientRedfish := d.getClientRedfish()
+
+	_, err2 := clientRedfish.RedfishV1.GetRoles(nil)
+	if err2 != nil {
+		return fmt.Errorf("The Redfish API Endpoint is not accessible. Error: %s", err2)
+	}
+
+	log.Infof("Test Passed. %v Monorail and Redfish API's are accessible and installation will begin", d.Endpoint)
 	return nil
 }
 
 func (d *Driver) Create() error {
 	//Generate the client
-	client := d.getClient()
+	client := d.getClientMonorail()
 
 	// do a lookup on the ID to retrieve IP information
 	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)
@@ -279,71 +290,219 @@ func (d *Driver) GetIP() (string, error) {
 }
 
 func (d *Driver) GetState() (state.State, error) {
-	/*
-		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
-		switch instance.State {
-		case "online":
-			return state.Running, nil
-		case "offline":
-			return state.Stopped, nil
+
+	//Get the Out of Band Management Type
+	clientMonorail := d.getClientMonorail()
+	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
+	if errObm != nil {
+		return state.None, errObm
+	}
+
+	//If there is no obm (such as Vagrant), send back as Running
+	switch respObm.Payload.([]interface{})[0].(map[string]interface{})["service"] {
+	case "noop-obm-service":
+		return state.Running, nil
+	default:
+		//Generate the client
+		clientRedfish := d.getClientRedfish()
+
+		// do a lookup on the Node ID to retrieve Power information
+		resp, err := clientRedfish.RedfishV1.GetSystem(&redfish_v1.GetSystemParams{Identifier: d.NodeID})
+		if err != nil {
+			return state.None, nil
 		}
-		return state.None, nil
-	*/
-	return state.Running, nil
+		switch resp.Payload.PowerState {
+		case "Online", "online", "Up", "up", "On", "on":
+			return state.Running, nil
+		case "Offline", "offline", "Down", "down", "Off", "off":
+			return state.Stopped, nil
+		case "Unknown", "unknown":
+			return state.None, nil
+		default:
+			return state.Running, nil
+		}
+	}
 }
 
 func (d *Driver) Start() error {
-	/*
-		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
-		REMOTELY POWER ON A SERVER VIA IPMI
-	*/
-	return nil
+
+	//Get the Out of Band Management Type
+	clientMonorail := d.getClientMonorail()
+	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
+	if errObm != nil {
+		return errObm
+	}
+
+	//If there is no obm (such as Vagrant), nil
+	switch respObm.Payload.([]interface{})[0].(map[string]interface{})["service"] {
+	case "noop-obm-service":
+		return fmt.Errorf("OBM %#v Type Not Supported For Starting: %#v", "noop-obm-service", d.NodeID)
+	default:
+		log.Debugf("Attempting Turn On: %#v", d.NodeID)
+		action := &modelsRedfish.RackHDResetAction{
+			ResetType: "On",
+		}
+
+		clientRedfish := d.getClientRedfish()
+
+		_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
+		if err != nil {
+			return fmt.Errorf("There was an issue Powering On the Server. Error: %s", err)
+		}
+
+		log.Debugf("Node has succussfully been powered on: %#v", d.NodeID)
+		return nil
+	}
 }
 
 func (d *Driver) Stop() error {
-	/*
-		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
-		SEND A SIGKILL TO THE OS. OR USE THE API TO GRACEFULLY SHUTDOWN THE HOST
-	*/
-	return nil
+	//Get the Out of Band Management Type
+	clientMonorail := d.getClientMonorail()
+	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
+	if errObm != nil {
+		return errObm
+	}
+
+	//If there is no obm (such as Vagrant), nil
+	switch respObm.Payload.([]interface{})[0].(map[string]interface{})["service"] {
+	case "noop-obm-service":
+		return fmt.Errorf("OBM %#v Type Not Supported For Stopping: %#v", "noop-obm-service", d.NodeID)
+	default:
+		log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
+		action := &modelsRedfish.RackHDResetAction{
+			ResetType: "GracefulShutdown",
+		}
+
+		clientRedfish := d.getClientRedfish()
+
+		_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
+		if err != nil {
+			return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
+		}
+		log.Debugf("Node has succussfully been shutdown: %#v", d.NodeID)
+		return nil
+	}
 }
 
 func (d *Driver) Remove() error {
-	/*
-		TODO: DECIDE WHETHER TO UNINSTALL DOCKER OR
-		1. ADD A GENERIC WORKFLOW
-		2. REBOOT THE HOST
-		3. HOPE THAT GENERIC WORKFLOW WILL RESET THE HOST BACK TO A BLANK SLATE
-	*/
+	//Get the Out of Band Management Type
+	clientMonorail := d.getClientMonorail()
+	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
+	if errObm != nil {
+		return errObm
+	}
+
+	//If there is no obm (such as Vagrant), nil
+	switch respObm.Payload.([]interface{})[0].(map[string]interface{})["service"] {
+	case "noop-obm-service":
+		log.Debugf("OBM %#v Type Not Supported For Shutdown: %#v", "noop-obm-service", d.NodeID)
+	default:
+		log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
+		action := &modelsRedfish.RackHDResetAction{
+			ResetType: "GracefulShutdown",
+		}
+
+		clientRedfish := d.getClientRedfish()
+
+		_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
+		if err != nil {
+			log.Infof("There was an issue Shutting Down the Server. Error: %s", err)
+			//return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
+		} else {
+			log.Debugf("Node has succussfully been shutdown: %#v", d.NodeID)
+		}
+	}
+
+	//Remove the Node from RackHD Inventory
+	log.Debugf("Removing Node From RackHD: %#v", d.NodeID)
+	_, err2 := clientMonorail.Nodes.DeleteNodesIdentifier(&nodes.DeleteNodesIdentifierParams{Identifier: d.NodeID}, nil)
+	if err2 != nil {
+		return err2
+	}
+	log.Debugf("Successfully Removed Node From RackHD: %#v", d.NodeID)
+
 	return nil
 }
 
 func (d *Driver) Restart() error {
-	/*
-		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
-		REMOTELY RESET OFF A SERVER VIA IPMI
-	*/
-	return nil
+	//Get the Out of Band Management Type
+	clientMonorail := d.getClientMonorail()
+	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
+	if errObm != nil {
+		return errObm
+	}
+
+	//If there is no obm (such as Vagrant), nil
+	switch respObm.Payload.([]interface{})[0].(map[string]interface{})["service"] {
+	case "noop-obm-service":
+		return fmt.Errorf("OBM Type Not Supported: %#v, %#v", "noop-obm-service", d.NodeID)
+	default:
+		log.Debugf("Attempting Restart of: %#v", d.NodeID)
+		action := &modelsRedfish.RackHDResetAction{
+			ResetType: "GracefulRestart",
+		}
+
+		clientRedfish := d.getClientRedfish()
+
+		_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
+		if err != nil {
+			return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
+		}
+		log.Debugf("Successfully restarted node: %#v", d.NodeID)
+		return nil
+	}
 }
 
 func (d *Driver) Kill() error {
-	/*
-		TODO: THIS REQUIRES THE REDFISH API WHICH IS STILL IN DEVELOPMENT
-		POWER OFF THE HOST VIA IMPI
-	*/
-	return nil
+	//Get the Out of Band Management Type
+	clientMonorail := d.getClientMonorail()
+	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
+	if errObm != nil {
+		return errObm
+	}
+
+	//If there is no obm (such as Vagrant), nil
+	switch respObm.Payload.([]interface{})[0].(map[string]interface{})["service"] {
+	case "noop-obm-service":
+		return fmt.Errorf("OBM Type Not Supported: %#v, %#v", "noop-obm-service", d.NodeID)
+	default:
+		log.Debugf("Attempting Force Off of: %#v", d.NodeID)
+		action := &modelsRedfish.RackHDResetAction{
+			ResetType: "ForceOff",
+		}
+
+		clientRedfish := d.getClientRedfish()
+
+		_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
+		if err != nil {
+			return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
+		}
+		log.Debugf("Successfully turned off node: %#v", d.NodeID)
+		return nil
+	}
 }
 
-func (d *Driver) getClient() *apiclient.Monorail {
-	log.Debugf("Getting RackHD Client")
-	if d.client == nil {
+func (d *Driver) getClientMonorail() *apiclientMonorail.Monorail {
+	log.Debugf("Getting RackHD Monorail Client")
+	if d.clientMonorail == nil {
 		// create the transport
 		/** Will Need to determine changes for v 2.0 API **/
 		transport := httptransport.New(d.Endpoint, "/api/1.1", []string{d.Transport})
 		// create the API client, with the transport
-		d.client = apiclient.New(transport, strfmt.Default)
+		d.clientMonorail = apiclientMonorail.New(transport, strfmt.Default)
 	}
-	return d.client
+	return d.clientMonorail
+}
+
+func (d *Driver) getClientRedfish() *apiclientRedfish.Redfish {
+	log.Debugf("Getting RackHD Redfish Client")
+	if d.clientRedfish == nil {
+		// create the transport
+		transport := httptransport.New(d.Endpoint, "/redfish/v1", []string{d.Transport})
+		// create the API client, with the transport
+		d.clientRedfish = apiclientRedfish.New(transport, strfmt.Default)
+	}
+	return d.clientRedfish
 }
 
 func (d *Driver) publicSSHKeyPath() string {

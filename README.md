@@ -1,6 +1,8 @@
 # Docker Machine Driver for RackHD
 
-Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and [Docker Swarm](https://github.com/docker/swarm).
+Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and configuration of [Docker Swarm](https://github.com/docker/swarm) to a hardware agnostic server infrastructure.
+
+Docker Machine Driver for RackHD increases efficiency by using RackHD APIs to drive automation for all compatible hardware. This entirely new solution differs from other available drivers that are focused on automating virtual machines or proprietary stacks, and allows users to capture all the robust benefits such as increased application performance and reduced management complexity by removing the hypervisor layer.
 
 ## Installation
 
@@ -67,11 +69,19 @@ Docker is up and running!
 To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: docker-machine env rackhdtest
 ```
 
+---
+
 Check out the [RackHD Vagrant + Docker Machine Example](https://github.com/emccode/machine/tree/master/rackhd) to view a complete in-depth configuration and walk-through.
 
-## Other Machine Functions
+[![Docker Machine Driver for RackHD Vagrant Setup and Testing](http://i.imgur.com/346xWSZ.png)](https://github.com/emccode/machine/tree/master/rackhd "Docker Machine Driver for RackHD Vagrant Setup and Testing")
 
-The other functions for **Start**, **Stop**, **Restart**, **Kill**, and **Remove** require the use of IPMI. This must be configured in RackHD.
+## Docker Machine Functions
+
+The functions for life cycle of machine management such as **Start**, **Stop**, **Restart**, **Kill**, and **Remove** requires the use of IPMI. The driver pulls credentials for IPMI usage from the node configurations within RackHD. Be sure these credentials are a part of the RackHD provisioning workflow when a node is being discovered.
+
+## TODO
+
+- Today, nodes are configured through an explicit creation by specifying the Node ID. Looking to move towards an implicit creation model by specifying a SKU and using that as a pooled model of resources.
 
 # Licensing
 Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License. You may obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>

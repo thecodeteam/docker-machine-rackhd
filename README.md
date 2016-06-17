@@ -1,8 +1,8 @@
-# Docker Machine Driver for RackHD
+# RackHD Driver for Docker Machine
 
 Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and configuration of [Docker Swarm](https://github.com/docker/swarm) to a hardware agnostic server infrastructure.
 
-Docker Machine Driver for RackHD increases efficiency by using RackHD APIs to drive automation for all compatible hardware. This entirely new solution differs from other available drivers that are focused on automating virtual machines or proprietary stacks, and allows users to capture all the robust benefits such as increased application performance and reduced management complexity by removing the hypervisor layer.
+RackHD Driver for Docker Machine increases efficiency by using RackHD APIs to drive automation for all compatible hardware. This entirely new solution differs from other available drivers that are focused on automating virtual machines or proprietary stacks, and allows users to capture all the robust benefits such as increased application performance and reduced management complexity by removing the hypervisor layer.
 
 ## Installation
 

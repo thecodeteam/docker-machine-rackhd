@@ -15,8 +15,12 @@ import (
 	"github.com/emccode/gorackhd/client/lookups"
 	"github.com/emccode/gorackhd/client/nodes"
 
-	httptransport "github.com/go-swagger/go-swagger/httpkit/client"
-	"github.com/go-swagger/go-swagger/strfmt"
+	// Need the *old* style libraries for redfish
+	red_httptransport "github.com/go-swagger/go-swagger/httpkit/client"
+	red_strfmt "github.com/go-swagger/go-swagger/strfmt"
+
+	mono_httptransport "github.com/go-openapi/runtime/client"
+	mono_strfmt "github.com/go-openapi/strfmt"
 
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
@@ -487,9 +491,9 @@ func (d *Driver) getClientMonorail() *apiclientMonorail.Monorail {
 	if d.clientMonorail == nil {
 		// create the transport
 		/** Will Need to determine changes for v 2.0 API **/
-		transport := httptransport.New(d.Endpoint, "/api/1.1", []string{d.Transport})
+		transport := mono_httptransport.New(d.Endpoint, "/api/1.1", []string{d.Transport})
 		// create the API client, with the transport
-		d.clientMonorail = apiclientMonorail.New(transport, strfmt.Default)
+		d.clientMonorail = apiclientMonorail.New(transport, mono_strfmt.Default)
 	}
 	return d.clientMonorail
 }
@@ -498,9 +502,9 @@ func (d *Driver) getClientRedfish() *apiclientRedfish.Redfish {
 	log.Debugf("Getting RackHD Redfish Client")
 	if d.clientRedfish == nil {
 		// create the transport
-		transport := httptransport.New(d.Endpoint, "/redfish/v1", []string{d.Transport})
+		transport := red_httptransport.New(d.Endpoint, "/redfish/v1", []string{d.Transport})
 		// create the API client, with the transport
-		d.clientRedfish = apiclientRedfish.New(transport, strfmt.Default)
+		d.clientRedfish = apiclientRedfish.New(transport, red_strfmt.Default)
 	}
 	return d.clientRedfish
 }

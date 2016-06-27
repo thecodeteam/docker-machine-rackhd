@@ -1,0 +1,14 @@
+package: github.com/emccode/docker-machine-rackhd
+import:
+- package: github.com/emccode/gorackhd
+  subpackages:
+  - client
+  - models
+  vcs: git
+  ref: 3eadf9e9eafd10a32c7ddf7e464f200f61d08044
+- package: github.com/emccode/gorackhd-redfish
+  subpackages:
+  - client
+  - models
+  vcs: git
+  ref: b33dab80a8736bb7cdab735867bd7cc2d668c6e0

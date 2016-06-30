@@ -35,6 +35,7 @@ type Driver struct {
 	*drivers.BaseDriver
 	Endpoint       string
 	NodeID         string
+	SkuID          string
 	SSHUser        string
 	SSHPassword    string
 	SSHPort        int
@@ -63,7 +64,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_NODE_ID",
 			Name:   "rackhd-node-id",
-			Usage:  "REQUIRED: Specify Node ID, MAC Address or IP Address",
+			Usage:  "Specify Node ID, MAC Address or IP Address",
+		},
+		mcnflag.StringFlag{
+			EnvVar: "RACKHD_SKU_ID",
+			Name:   "rackhd-sku-id",
+			Usage:  "SKU ID to use as pool of nodes to choose from",
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_TRANSPORT",
@@ -95,12 +101,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 				EnvVar: "RACKHD_WORKFLOW_ID",
 				Name:   "rackhd-workflow-id",
 				Usage:  "workflow ID used to extract SSH user information (optional)",
-			},
-			TODO: Implicit creation from a pool
-			mcnflag.StringFlag{
-				EnvVar: "RACKHD_POOL_ID",
-				Name:   "rackhd-POOL-id",
-				Usage:  "POOL ID",
 			},
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
 			mcnflag.StringFlag{
@@ -138,8 +138,12 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.Endpoint = flags.String("rackhd-endpoint")
 
 	d.NodeID = flags.String("rackhd-node-id")
-	if d.NodeID == "" {
-		return fmt.Errorf("rackhd driver requires the --rackhd-node-id option")
+	d.SkuID = flags.String("rackhd-sku-id")
+	if (d.NodeID == "" && d.SkuID == "") {
+		return fmt.Errorf("rackhd driver requires either the --rackhd-node-id or --rackhd-sku-id option")
+	}
+	if (d.NodeID != "" && d.SkuID != "") {
+		return fmt.Errorf("rackhd driver accepts either the --rackhd-node-id or --rackhd-sku-id option, not both")
 	}
 
 	d.SSHUser = flags.String("rackhd-ssh-user")
@@ -178,6 +182,22 @@ func (d *Driver) PreCreateCheck() error {
 func (d *Driver) Create() error {
 	//Generate the client
 	client := d.getClientMonorail()
+
+	if (d.SkuID != "") {
+		err := d.chooseNode(client)
+		if err != nil {
+			return err
+		}
+	}
+
+	return d.provisionNode(client)
+}
+
+func (d *Driver) chooseNode(client * apiclientMonorail.Monorail) error{
+	return nil
+}
+
+func (d *Driver) provisionNode(client * apiclientMonorail.Monorail) error {
 
 	// do a lookup on the ID to retrieve IP information
 	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)

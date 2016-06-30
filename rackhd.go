@@ -166,7 +166,7 @@ func (d *Driver) PreCreateCheck() error {
 
 	clientRedfish := d.getClientRedfish()
 
-	_, err2 := clientRedfish.RedfishV1.GetRoles(nil)
+	_, err2 := clientRedfish.RedfishV1.ListRoles(nil)
 	if err2 != nil {
 		return fmt.Errorf("The Redfish API Endpoint is not accessible. Error: %s", err2)
 	}
@@ -347,8 +347,9 @@ func (d *Driver) Start() error {
 			return fmt.Errorf("OBM %#v Type Not Supported For Starting: %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Turn On: %#v", d.NodeID)
-			action := &modelsRedfish.RackHDResetAction{
-				ResetType: "On",
+			resetType := "On"
+			action := &modelsRedfish.RackHDResetActionResetAction{
+				ResetType: &resetType,
 			}
 
 			clientRedfish := d.getClientRedfish()
@@ -380,8 +381,9 @@ func (d *Driver) Stop() error {
 			return fmt.Errorf("OBM %#v Type Not Supported For Stopping: %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
-			action := &modelsRedfish.RackHDResetAction{
-				ResetType: "GracefulShutdown",
+			resetType := "GracefulShutdown"
+			action := &modelsRedfish.RackHDResetActionResetAction{
+				ResetType: &resetType,
 			}
 
 			clientRedfish := d.getClientRedfish()
@@ -412,8 +414,9 @@ func (d *Driver) Remove() error {
 			log.Debugf("OBM %#v Type Not Supported For Shutdown: %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
-			action := &modelsRedfish.RackHDResetAction{
-				ResetType: "GracefulShutdown",
+			resetType := "GracefulShutdown"
+			action := &modelsRedfish.RackHDResetActionResetAction{
+				ResetType: &resetType,
 			}
 
 			clientRedfish := d.getClientRedfish()
@@ -456,8 +459,9 @@ func (d *Driver) Restart() error {
 			return fmt.Errorf("OBM Type Not Supported: %#v, %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Restart of: %#v", d.NodeID)
-			action := &modelsRedfish.RackHDResetAction{
-				ResetType: "GracefulRestart",
+			resetType := "GracefulRestart"
+			action := &modelsRedfish.RackHDResetActionResetAction{
+				ResetType: &resetType,
 			}
 
 			clientRedfish := d.getClientRedfish()
@@ -488,8 +492,9 @@ func (d *Driver) Kill() error {
 			return fmt.Errorf("OBM Type Not Supported: %#v, %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Force Off of: %#v", d.NodeID)
-			action := &modelsRedfish.RackHDResetAction{
-				ResetType: "ForceOff",
+			resetType := "ForceOff"
+			action := &modelsRedfish.RackHDResetActionResetAction{
+				ResetType: &resetType,
 			}
 
 			clientRedfish := d.getClientRedfish()

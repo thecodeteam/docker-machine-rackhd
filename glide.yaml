@@ -11,4 +11,4 @@ import:
   - client
   - models
   vcs: git
-  ref: b33dab80a8736bb7cdab735867bd7cc2d668c6e0
+  ref: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1

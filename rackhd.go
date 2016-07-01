@@ -7,13 +7,16 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"encoding/json"
 
 	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
 	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
 	modelsRedfish "github.com/emccode/gorackhd-redfish/models"
 	apiclientMonorail "github.com/emccode/gorackhd/client"
+	modelsMonorail "github.com/emccode/gorackhd/models"
 	"github.com/emccode/gorackhd/client/lookups"
 	"github.com/emccode/gorackhd/client/nodes"
+	"github.com/emccode/gorackhd/client/skus"
 
 	// Need the *old* style libraries for redfish
 	red_httptransport "github.com/go-swagger/go-swagger/httpkit/client"
@@ -194,6 +197,36 @@ func (d *Driver) Create() error {
 }
 
 func (d *Driver) chooseNode(client * apiclientMonorail.Monorail) error{
+	skuParams := skus.GetSkusIdentifierNodesParams{}
+	skuParams.WithIdentifier(d.SkuID)
+	resp, err := client.Skus.GetSkusIdentifierNodes(&skuParams, nil)
+	if err != nil {
+		return err
+	}
+
+	var chosenNode modelsMonorail.Node
+	log.Debugf("%v", resp)
+	for _, node := range resp.Payload {
+		n := &modelsMonorail.Node{}
+		buf, err := json.Marshal(node)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(buf, n)
+		if err != nil {
+			return err
+		}
+		tags := getTags(&n.Tags)
+		if !stringInSlice("dockermachine", tags) {
+			chosenNode = *n
+			break
+		}
+	}
+	if chosenNode.ID == "" {
+		return fmt.Errorf("No suitable node found in SKU")
+	}
+
+	d.NodeID = chosenNode.ID
 	return nil
 }
 
@@ -591,4 +624,21 @@ func executeSSHCommand(command string, d *Driver) error {
 	log.Debugf("Stdout from executeSSHCommand: %s", b.String())
 
 	return nil
+}
+
+func getTags(input *[]interface{}) []string {
+	tags := make([]string, len(*input))
+	for i, tag := range *input {
+		tags[i] = tag.(string)
+	}
+	return tags
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }

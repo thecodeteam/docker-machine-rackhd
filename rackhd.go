@@ -179,19 +179,23 @@ func (d *Driver) PreCreateCheck() error {
 	}
 
 	log.Infof("Test Passed. %v Monorail and Redfish API's are accessible and installation will begin", d.Endpoint)
+
+	if (d.SkuID != "") {
+		log.Infof("Looking for available node within SKU")
+		err := d.chooseNode(clientMonorail)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Infof("Found a free node with SKU, Node ID: %v", d.NodeID)
+
 	return nil
 }
 
 func (d *Driver) Create() error {
 	//Generate the client
 	client := d.getClientMonorail()
-
-	if (d.SkuID != "") {
-		err := d.chooseNode(client)
-		if err != nil {
-			return err
-		}
-	}
 
 	return d.provisionNode(client)
 }

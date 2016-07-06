@@ -227,6 +227,11 @@ func (d *Driver) chooseNode(client * apiclientMonorail.Monorail) error{
 	}
 
 	d.NodeID = chosenNode.ID
+
+	err = d.tagNode(d.NodeID, "dockermachine")
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -561,6 +566,20 @@ func (d *Driver) Kill() error {
 		}
 	}
 	return fmt.Errorf("There was an issue Shutting Down the Server. Error: No OBM detected")
+}
+
+func (d *Driver) tagNode(targetNode, targetTag string) error {
+	clientMonorail := d.getClientMonorail()
+	params := nodes.NewPatchNodesIdentifierTagsParams()
+	body := make(map[string]interface{})
+	var tags [1]string
+	tags[0] = targetTag
+	body["tags"] = tags
+
+	params.WithBody(body)
+	params.WithIdentifier(targetNode)
+	_, err := clientMonorail.Nodes.PatchNodesIdentifierTags(params, nil)
+	return err
 }
 
 func (d *Driver) getClientMonorail() *apiclientMonorail.Monorail {

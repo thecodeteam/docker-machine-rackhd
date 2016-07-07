@@ -7,13 +7,16 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"encoding/json"
 
 	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
 	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
 	modelsRedfish "github.com/emccode/gorackhd-redfish/models"
 	apiclientMonorail "github.com/emccode/gorackhd/client"
+	modelsMonorail "github.com/emccode/gorackhd/models"
 	"github.com/emccode/gorackhd/client/lookups"
 	"github.com/emccode/gorackhd/client/nodes"
+	"github.com/emccode/gorackhd/client/skus"
 
 	// Need the *old* style libraries for redfish
 	red_httptransport "github.com/go-swagger/go-swagger/httpkit/client"
@@ -35,6 +38,7 @@ type Driver struct {
 	*drivers.BaseDriver
 	Endpoint       string
 	NodeID         string
+	SkuID          string
 	SSHUser        string
 	SSHPassword    string
 	SSHPort        int
@@ -63,7 +67,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_NODE_ID",
 			Name:   "rackhd-node-id",
-			Usage:  "REQUIRED: Specify Node ID, MAC Address or IP Address",
+			Usage:  "Specify Node ID, MAC Address or IP Address",
+		},
+		mcnflag.StringFlag{
+			EnvVar: "RACKHD_SKU_ID",
+			Name:   "rackhd-sku-id",
+			Usage:  "SKU ID to use as pool of nodes to choose from",
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_TRANSPORT",
@@ -95,12 +104,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 				EnvVar: "RACKHD_WORKFLOW_ID",
 				Name:   "rackhd-workflow-id",
 				Usage:  "workflow ID used to extract SSH user information (optional)",
-			},
-			TODO: Implicit creation from a pool
-			mcnflag.StringFlag{
-				EnvVar: "RACKHD_POOL_ID",
-				Name:   "rackhd-POOL-id",
-				Usage:  "POOL ID",
 			},
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
 			mcnflag.StringFlag{
@@ -138,8 +141,12 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.Endpoint = flags.String("rackhd-endpoint")
 
 	d.NodeID = flags.String("rackhd-node-id")
-	if d.NodeID == "" {
-		return fmt.Errorf("rackhd driver requires the --rackhd-node-id option")
+	d.SkuID = flags.String("rackhd-sku-id")
+	if (d.NodeID == "" && d.SkuID == "") {
+		return fmt.Errorf("rackhd driver requires either the --rackhd-node-id or --rackhd-sku-id option")
+	}
+	if (d.NodeID != "" && d.SkuID != "") {
+		return fmt.Errorf("rackhd driver accepts either the --rackhd-node-id or --rackhd-sku-id option, not both")
 	}
 
 	d.SSHUser = flags.String("rackhd-ssh-user")
@@ -172,12 +179,67 @@ func (d *Driver) PreCreateCheck() error {
 	}
 
 	log.Infof("Test Passed. %v Monorail and Redfish API's are accessible and installation will begin", d.Endpoint)
+
+	if (d.SkuID != "") {
+		log.Infof("Looking for available node within SKU")
+		err := d.chooseNode(clientMonorail)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Infof("Found a free node with SKU, Node ID: %v", d.NodeID)
+
 	return nil
 }
 
 func (d *Driver) Create() error {
 	//Generate the client
 	client := d.getClientMonorail()
+
+	return d.provisionNode(client)
+}
+
+func (d *Driver) chooseNode(client * apiclientMonorail.Monorail) error{
+	skuParams := skus.GetSkusIdentifierNodesParams{}
+	skuParams.WithIdentifier(d.SkuID)
+	resp, err := client.Skus.GetSkusIdentifierNodes(&skuParams, nil)
+	if err != nil {
+		return err
+	}
+
+	var chosenNode modelsMonorail.Node
+	log.Debugf("%v", resp)
+	for _, node := range resp.Payload {
+		n := &modelsMonorail.Node{}
+		buf, err := json.Marshal(node)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(buf, n)
+		if err != nil {
+			return err
+		}
+		tags := getTags(&n.Tags)
+		if !stringInSlice("dockermachine", tags) {
+			chosenNode = *n
+			break
+		}
+	}
+	if chosenNode.ID == "" {
+		return fmt.Errorf("No suitable node found in SKU")
+	}
+
+	d.NodeID = chosenNode.ID
+
+	err = d.tagNode(d.NodeID, "dockermachine")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Driver) provisionNode(client * apiclientMonorail.Monorail) error {
 
 	// do a lookup on the ID to retrieve IP information
 	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)
@@ -510,6 +572,20 @@ func (d *Driver) Kill() error {
 	return fmt.Errorf("There was an issue Shutting Down the Server. Error: No OBM detected")
 }
 
+func (d *Driver) tagNode(targetNode, targetTag string) error {
+	clientMonorail := d.getClientMonorail()
+	params := nodes.NewPatchNodesIdentifierTagsParams()
+	body := make(map[string]interface{})
+	var tags [1]string
+	tags[0] = targetTag
+	body["tags"] = tags
+
+	params.WithBody(body)
+	params.WithIdentifier(targetNode)
+	_, err := clientMonorail.Nodes.PatchNodesIdentifierTags(params, nil)
+	return err
+}
+
 func (d *Driver) getClientMonorail() *apiclientMonorail.Monorail {
 	log.Debugf("Getting RackHD Monorail Client")
 	if d.clientMonorail == nil {
@@ -571,4 +647,21 @@ func executeSSHCommand(command string, d *Driver) error {
 	log.Debugf("Stdout from executeSSHCommand: %s", b.String())
 
 	return nil
+}
+
+func getTags(input *[]interface{}) []string {
+	tags := make([]string, len(*input))
+	for i, tag := range *input {
+		tags[i] = tag.(string)
+	}
+	return tags
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }

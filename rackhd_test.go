@@ -48,7 +48,7 @@ func TestSetEndpoint(t *testing.T) {
 	checkFlags := &drivers.CheckDriverOptions{
 		FlagsValues: map[string]interface{}{
 			"rackhd-endpoint": "localhost:9090",
-			"rackhd-node-id": "aabbccdd",
+			"rackhd-node-id":  "aabbccdd",
 		},
 		CreateFlags: d.GetCreateFlags(),
 	}
@@ -84,7 +84,7 @@ func TestOnlyNodeOrSkuIDAllowed(t *testing.T) {
 	checkFlags := &drivers.CheckDriverOptions{
 		FlagsValues: map[string]interface{}{
 			"rackhd-node-id": "aabbccdd",
-			"rackhd-sku-id": "eeffgghh",
+			"rackhd-sku-id":  "eeffgghh",
 		},
 		CreateFlags: d.GetCreateFlags(),
 	}
@@ -92,4 +92,38 @@ func TestOnlyNodeOrSkuIDAllowed(t *testing.T) {
 	err := d.SetConfigFromFlags(checkFlags)
 
 	assert.Error(t, err, "Should error if both SKU and Node ID is given")
+}
+
+func TestOnlyNodeOrSkuNameAllowed(t *testing.T) {
+	// create the Driver
+	d := NewDriver("default", "path")
+
+	checkFlags := &drivers.CheckDriverOptions{
+		FlagsValues: map[string]interface{}{
+			"rackhd-node-id":  "aabbccdd",
+			"rackhd-sku-name": "test sku",
+		},
+		CreateFlags: d.GetCreateFlags(),
+	}
+
+	err := d.SetConfigFromFlags(checkFlags)
+
+	assert.Error(t, err, "Should error if both SKU Name and Node ID are given")
+}
+
+func TestOnlySkuNameOrSkuIDAllowed(t *testing.T) {
+	// create the Driver
+	d := NewDriver("default", "path")
+
+	checkFlags := &drivers.CheckDriverOptions{
+		FlagsValues: map[string]interface{}{
+			"rackhd-sku-id":   "aabbccdd",
+			"rackhd-sku-name": "test sku",
+		},
+		CreateFlags: d.GetCreateFlags(),
+	}
+
+	err := d.SetConfigFromFlags(checkFlags)
+
+	assert.Error(t, err, "Should error if both SKU Name and ID are given")
 }

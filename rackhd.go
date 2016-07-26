@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
 	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
@@ -16,6 +17,7 @@ import (
 	"github.com/emccode/gorackhd/client/lookups"
 	"github.com/emccode/gorackhd/client/nodes"
 	"github.com/emccode/gorackhd/client/skus"
+	"github.com/emccode/gorackhd/client/workflow"
 	modelsMonorail "github.com/emccode/gorackhd/models"
 
 	// Need the *old* style libraries for redfish
@@ -40,6 +42,7 @@ type Driver struct {
 	NodeID         string
 	SkuID          string
 	SkuName        string
+	WorkflowName   string
 	SSHUser        string
 	SSHPassword    string
 	SSHPort        int
@@ -81,6 +84,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Friendly SKU NAME to use as pool of nodes to choose from",
 		},
 		mcnflag.StringFlag{
+			EnvVar: "RACKHD_WORKFLOW_NAME",
+			Name:   "rackhd-workflow-name",
+			Usage:  "Name of workflow to invoke after node is chosen (optional)",
+		},
+		mcnflag.StringFlag{
 			EnvVar: "RACKHD_TRANSPORT",
 			Name:   "rackhd-transport",
 			Usage:  "RackHD Endpoint Transport. Specify http or https. HTTP is default",
@@ -105,12 +113,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Value:  defaultSSHPort,
 		},
 		/*
-			TODO: Grab SSH User and PW from Workflow.
-			mcnflag.StringFlag{
-				EnvVar: "RACKHD_WORKFLOW_ID",
-				Name:   "rackhd-workflow-id",
-				Usage:  "workflow ID used to extract SSH user information (optional)",
-			},
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
 			mcnflag.StringFlag{
 				EnvVar: "RACKHD_ENDPOINT_AUTH",
@@ -158,6 +160,8 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	if d.SkuID != "" && d.SkuName != "" {
 		return fmt.Errorf("rackhd driver accepts either the --rackhd-sku-id or --rackhd-sku-name option, not both")
 	}
+
+	d.WorkflowName = flags.String("rackhd-workflow-name")
 
 	d.SSHUser = flags.String("rackhd-ssh-user")
 	d.SSHPassword = flags.String("rackhd-ssh-password")
@@ -215,7 +219,19 @@ func (d *Driver) Create() error {
 	//Generate the client
 	client := d.getClientMonorail()
 
-	return d.provisionNode(client)
+	if d.WorkflowName != "" {
+		wfInstance, err := d.applyWorkflow(client)
+		if err != nil {
+			return err
+		}
+		log.Debugf("Workflow %s applied as instance id %s", d.WorkflowName, wfInstance)
+		err = d.waitForWorkflow(client, wfInstance, 60, 15)
+		if err != nil {
+			return err
+		}
+	}
+
+	return d.checkConnectivity(client)
 }
 
 func (d *Driver) chooseNode(client *apiclientMonorail.Monorail) error {
@@ -257,7 +273,68 @@ func (d *Driver) chooseNode(client *apiclientMonorail.Monorail) error {
 	return nil
 }
 
-func (d *Driver) provisionNode(client *apiclientMonorail.Monorail) error {
+func (d *Driver) applyWorkflow(client *apiclientMonorail.Monorail) (string, error) {
+	// POST workflow to node
+	params := nodes.NewPostNodesIdentifierWorkflowsParams()
+	params.WithIdentifier(d.NodeID)
+	params.WithName(d.WorkflowName)
+	resp, err := client.Nodes.PostNodesIdentifierWorkflows(params, nil)
+	if err != nil {
+		return "", err
+	}
+
+	var id interface{}
+	id, err = getRootLevelVal(resp.Payload.(map[string]interface{}), "instanceId")
+	if err != nil {
+		return "", err
+	}
+
+	return id.(string), nil
+}
+
+func (d *Driver) waitForWorkflow(client *apiclientMonorail.Monorail, wfInstance string, timeoutMins, pollSecs int) error {
+	timeout := time.After(time.Duration(timeoutMins) * time.Minute)
+	tick := time.Tick(time.Duration(pollSecs) * time.Second)
+	log.Debugf("Waiting up to %v minutes for workflow to complete", timeoutMins)
+	log.Debugf("checking status every %v seconds", pollSecs)
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("Timeout waiting for workflow to finish")
+		case <-tick:
+			// Check if workflow is finished or still running
+			params := workflow.NewGetWorkflowsInstanceIDParams()
+			params.WithInstanceID(wfInstance)
+			resp, err := client.Workflow.GetWorkflowsInstanceID(params, nil)
+			if err != nil {
+				return err
+			}
+
+			var status interface{}
+			status, err = getRootLevelVal(resp.Payload.(map[string]interface{}), "_status")
+			if err != nil {
+				return err
+			}
+			if status.(string) == "succeeded" {
+				log.Debugf("Worklow successful!")
+				return nil
+			} else if status.(string) != "running" {
+				return fmt.Errorf("Workflow appears to have failed")
+			}
+		}
+	}
+}
+
+func getRootLevelVal(payload map[string]interface{}, keyToFind string) (interface{}, error) {
+	for key, val := range payload {
+		if key == keyToFind {
+			return val, nil
+		}
+	}
+	return nil, fmt.Errorf("Key %v not found", keyToFind)
+}
+
+func (d *Driver) checkConnectivity(client *apiclientMonorail.Monorail) error {
 
 	// do a lookup on the ID to retrieve IP information
 	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: &d.NodeID}, nil)

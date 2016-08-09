@@ -2,21 +2,21 @@ package rackhd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"strconv"
 	"strings"
-	"encoding/json"
 
 	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
 	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
 	modelsRedfish "github.com/emccode/gorackhd-redfish/models"
 	apiclientMonorail "github.com/emccode/gorackhd/client"
-	modelsMonorail "github.com/emccode/gorackhd/models"
 	"github.com/emccode/gorackhd/client/lookups"
 	"github.com/emccode/gorackhd/client/nodes"
 	"github.com/emccode/gorackhd/client/skus"
+	modelsMonorail "github.com/emccode/gorackhd/models"
 
 	// Need the *old* style libraries for redfish
 	red_httptransport "github.com/go-swagger/go-swagger/httpkit/client"
@@ -39,6 +39,7 @@ type Driver struct {
 	Endpoint       string
 	NodeID         string
 	SkuID          string
+	SkuName        string
 	SSHUser        string
 	SSHPassword    string
 	SSHPort        int
@@ -73,6 +74,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "RACKHD_SKU_ID",
 			Name:   "rackhd-sku-id",
 			Usage:  "SKU ID to use as pool of nodes to choose from",
+		},
+		mcnflag.StringFlag{
+			EnvVar: "RACKHD_SKU_NAME",
+			Name:   "rackhd-sku-name",
+			Usage:  "Friendly SKU NAME to use as pool of nodes to choose from",
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_TRANSPORT",
@@ -142,11 +148,15 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.NodeID = flags.String("rackhd-node-id")
 	d.SkuID = flags.String("rackhd-sku-id")
-	if (d.NodeID == "" && d.SkuID == "") {
-		return fmt.Errorf("rackhd driver requires either the --rackhd-node-id or --rackhd-sku-id option")
+	d.SkuName = flags.String("rackhd-sku-name")
+	if d.NodeID == "" && d.SkuID == "" && d.SkuName == "" {
+		return fmt.Errorf("rackhd driver requires either the --rackhd-node-id or --rackhd-sku-[id/name] option")
 	}
-	if (d.NodeID != "" && d.SkuID != "") {
-		return fmt.Errorf("rackhd driver accepts either the --rackhd-node-id or --rackhd-sku-id option, not both")
+	if d.NodeID != "" && (d.SkuID != "" || d.SkuName != "") {
+		return fmt.Errorf("rackhd driver accepts either the --rackhd-node-id or --rackhd-sku-[id/name] option, not both")
+	}
+	if d.SkuID != "" && d.SkuName != "" {
+		return fmt.Errorf("rackhd driver accepts either the --rackhd-sku-id or --rackhd-sku-name option, not both")
 	}
 
 	d.SSHUser = flags.String("rackhd-ssh-user")
@@ -173,16 +183,24 @@ func (d *Driver) PreCreateCheck() error {
 
 	clientRedfish := d.getClientRedfish()
 
-	_, err2 := clientRedfish.RedfishV1.ListRoles(nil)
-	if err2 != nil {
-		return fmt.Errorf("The Redfish API Endpoint is not accessible. Error: %s", err2)
+	_, err = clientRedfish.RedfishV1.ListRoles(nil)
+	if err != nil {
+		return fmt.Errorf("The Redfish API Endpoint is not accessible. Error: %s", err)
 	}
 
 	log.Infof("Test Passed. %v Monorail and Redfish API's are accessible and installation will begin", d.Endpoint)
 
-	if (d.SkuID != "") {
+	if d.SkuName != "" {
+		log.Debugf("Looking up SKU ID by name")
+		err = d.lookupSkuByName(clientMonorail)
+		if err != nil {
+			return err
+		}
+	}
+
+	if d.SkuID != "" {
 		log.Infof("Looking for available node within SKU")
-		err := d.chooseNode(clientMonorail)
+		err = d.chooseNode(clientMonorail)
 		if err != nil {
 			return err
 		}
@@ -200,7 +218,7 @@ func (d *Driver) Create() error {
 	return d.provisionNode(client)
 }
 
-func (d *Driver) chooseNode(client * apiclientMonorail.Monorail) error{
+func (d *Driver) chooseNode(client *apiclientMonorail.Monorail) error {
 	skuParams := skus.GetSkusIdentifierNodesParams{}
 	skuParams.WithIdentifier(d.SkuID)
 	resp, err := client.Skus.GetSkusIdentifierNodes(&skuParams, nil)
@@ -239,7 +257,7 @@ func (d *Driver) chooseNode(client * apiclientMonorail.Monorail) error{
 	return nil
 }
 
-func (d *Driver) provisionNode(client * apiclientMonorail.Monorail) error {
+func (d *Driver) provisionNode(client *apiclientMonorail.Monorail) error {
 
 	// do a lookup on the ID to retrieve IP information
 	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)
@@ -314,6 +332,33 @@ func (d *Driver) provisionNode(client * apiclientMonorail.Monorail) error {
 	}
 
 	return nil
+}
+
+func (d *Driver) lookupSkuByName(client *apiclientMonorail.Monorail) error {
+	// Get list of all Skus
+	resp, err := client.Skus.GetSkus(nil, nil)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("%v", resp)
+	n := &modelsMonorail.Sku{}
+	for _, sku := range resp.Payload {
+		buf, err := json.Marshal(sku)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(buf, n)
+		if err != nil {
+			return err
+		}
+
+		if n.Name == d.SkuName {
+			d.SkuID = n.ID
+			return nil
+		}
+	}
+	return fmt.Errorf("No matching SKU found")
 }
 
 func (d *Driver) GetSSHHostname() (string, error) {
@@ -436,7 +481,7 @@ func (d *Driver) Stop() error {
 		return errObm
 	}
 
-	if len(respObm.Payload) > 0{
+	if len(respObm.Payload) > 0 {
 		//If there is no obm (such as Vagrant), nil
 		switch respObm.Payload[0].(map[string]interface{})["service"] {
 		case "noop-obm-service":
@@ -469,7 +514,7 @@ func (d *Driver) Remove() error {
 		return errObm
 	}
 
-	if len(respObm.Payload) > 0{
+	if len(respObm.Payload) > 0 {
 		//If there is no obm (such as Vagrant), nil
 		switch respObm.Payload[0].(map[string]interface{})["service"] {
 		case "noop-obm-service":

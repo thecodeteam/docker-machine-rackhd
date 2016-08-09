@@ -260,7 +260,7 @@ func (d *Driver) chooseNode(client *apiclientMonorail.Monorail) error {
 func (d *Driver) provisionNode(client *apiclientMonorail.Monorail) error {
 
 	// do a lookup on the ID to retrieve IP information
-	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: d.NodeID}, nil)
+	resp, err := client.Lookups.GetLookups(&lookups.GetLookupsParams{Q: &d.NodeID}, nil)
 	if err != nil {
 		return err
 	}

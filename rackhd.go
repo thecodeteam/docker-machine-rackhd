@@ -220,9 +220,8 @@ func (d *Driver) PreCreateCheck() error {
 		if err != nil {
 			return err
 		}
+		log.Infof("Found a free node within SKU, Node ID: %v", d.NodeID)
 	}
-
-	log.Infof("Found a free node with SKU, Node ID: %v", d.NodeID)
 
 	if d.SSHKeyPath == "" {
 		log.Infof("No SSH Key specified. Will attempt login with user/pass and upload generated key pair")

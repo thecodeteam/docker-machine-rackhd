@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -46,7 +47,6 @@ type Driver struct {
 	SSHUser        string
 	SSHPassword    string
 	SSHPort        int
-	SSHKey         string
 	Transport      string
 	clientMonorail *apiclientMonorail.Monorail
 	clientRedfish  *apiclientRedfish.Redfish
@@ -112,6 +112,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "ssh port (default:22)",
 			Value:  defaultSSHPort,
 		},
+		mcnflag.StringFlag{
+			EnvVar: "RACKHD_SSH_KEY",
+			Name:   "rackhd-ssh-key",
+			Usage:  "SSH private key path (if not provided, default SSH key will be used)",
+		},
 		/*
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
 			mcnflag.StringFlag{
@@ -172,6 +177,13 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		d.Transport = flags.String("rackhd-transport")
 	}
 
+	d.SSHKeyPath = flags.String("rackhd-ssh-key")
+	if d.SSHKeyPath != "" {
+		if _, err := os.Stat(d.SSHKeyPath); os.IsNotExist(err) {
+			return fmt.Errorf("SSH key does not exist: %q", d.SSHKeyPath)
+		}
+	}
+
 	return nil
 }
 
@@ -211,6 +223,10 @@ func (d *Driver) PreCreateCheck() error {
 	}
 
 	log.Infof("Found a free node with SKU, Node ID: %v", d.NodeID)
+
+	if d.SSHKeyPath == "" {
+		log.Infof("No SSH Key specified. Will attempt login with user/pass and upload generated key pair")
+	}
 
 	return nil
 }
@@ -381,31 +397,33 @@ func (d *Driver) checkConnectivity(client *apiclientMonorail.Monorail) error {
 		return fmt.Errorf("No IP addresses are accessible on this network to the Node ID specified. Error: %s", err)
 	}
 
-	//create public SSH key
-	log.Infof("Creating SSH key...")
-	key, err := d.createSSHKey()
-	if err != nil {
-		return err
-	}
-	d.SSHKey = strings.TrimSpace(key)
+	if d.SSHKeyPath == "" {
+		//create public SSH key
+		log.Infof("Creating SSH key...")
+		pubkey, err := d.createSSHKey()
+		if err != nil {
+			return err
+		}
+		pubkey = strings.TrimSpace(pubkey)
 
-	//TAKEN FROM THE FUSION DRIVER TO USE SSH [THANKS!]
-	log.Infof("Copy public SSH key to %s [%s]", d.MachineName, d.IPAddress)
-	// create .ssh folder in users home
-	if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
-		return err
-	}
-	// add public ssh key to authorized_keys
-	if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", d.SSHKey, d.SSHUser), d); err != nil {
-		return err
-	}
-	// make it secure
-	if err := executeSSHCommand(fmt.Sprintf("chmod 700 /home/%s/.ssh", d.SSHUser), d); err != nil {
-		return err
-	}
-	// make it secure
-	if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.SSHUser), d); err != nil {
-		return err
+		//TAKEN FROM THE FUSION DRIVER TO USE SSH [THANKS!]
+		log.Infof("Copying public SSH key to %s [%s]", d.MachineName, d.IPAddress)
+		// create .ssh folder in users home
+		if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
+			return err
+		}
+		// add public ssh key to authorized_keys
+		if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", pubkey, d.SSHUser), d); err != nil {
+			return err
+		}
+		// make it secure
+		if err := executeSSHCommand(fmt.Sprintf("chmod 700 /home/%s/.ssh", d.SSHUser), d); err != nil {
+			return err
+		}
+		// make it secure
+		if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.SSHUser), d); err != nil {
+			return err
+		}
 	}
 
 	return nil

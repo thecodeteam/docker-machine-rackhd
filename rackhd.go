@@ -91,24 +91,26 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_TRANSPORT",
 			Name:   "rackhd-transport",
-			Usage:  "RackHD Endpoint Transport. Specify http or https. HTTP is default",
+			Usage:  "RackHD Endpoint Transport. Specify http or https.",
 			Value:  defaultTransport,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_USER",
 			Name:   "rackhd-ssh-user",
-			Usage:  "ssh user (default:root)",
+			Usage:  "SSH user",
+			Value:  drivers.DefaultSSHUser,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_PASSWORD",
 			Name:   "rackhd-ssh-password",
-			Usage:  "ssh password (default:root)",
+			Usage:  "SSH password",
 			Value:  defaultSSHPassword,
 		},
 		mcnflag.IntFlag{
 			EnvVar: "RACKHD_SSH_PORT",
 			Name:   "rackhd-ssh-port",
-			Usage:  "ssh port (default:22)",
+			Usage:  "SSH port",
+			Value:  drivers.DefaultSSHPort,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_KEY",

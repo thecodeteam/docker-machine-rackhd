@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -43,10 +44,7 @@ type Driver struct {
 	SkuID          string
 	SkuName        string
 	WorkflowName   string
-	SSHUser        string
 	SSHPassword    string
-	SSHPort        int
-	SSHKey         string
 	Transport      string
 	clientMonorail *apiclientMonorail.Monorail
 	clientRedfish  *apiclientRedfish.Redfish
@@ -55,9 +53,7 @@ type Driver struct {
 const (
 	defaultEndpoint    = "localhost:8080"
 	defaultTransport   = "http"
-	defaultSSHUser     = "root"
 	defaultSSHPassword = "root"
-	defaultSSHPort     = 22
 )
 
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
@@ -98,7 +94,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "RACKHD_SSH_USER",
 			Name:   "rackhd-ssh-user",
 			Usage:  "ssh user (default:root)",
-			Value:  defaultSSHUser,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_PASSWORD",
@@ -110,7 +105,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "RACKHD_SSH_PORT",
 			Name:   "rackhd-ssh-port",
 			Usage:  "ssh port (default:22)",
-			Value:  defaultSSHPort,
+		},
+		mcnflag.StringFlag{
+			EnvVar: "RACKHD_SSH_KEY",
+			Name:   "rackhd-ssh-key",
+			Usage:  "SSH private key path (if not provided, default SSH key will be used)",
 		},
 		/*
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
@@ -129,8 +128,6 @@ func NewDriver(hostName, storePath string) *Driver {
 		SSHPassword: defaultSSHPassword,
 		Transport:   defaultTransport,
 		BaseDriver: &drivers.BaseDriver{
-			SSHUser:     defaultSSHUser,
-			SSHPort:     defaultSSHPort,
 			MachineName: hostName,
 			StorePath:   storePath,
 		},
@@ -143,6 +140,17 @@ func (d *Driver) GetMachineName() string {
 
 func (d *Driver) DriverName() string {
 	return "rackhd"
+}
+
+/* Need this silly wrapper around d.GetSSHPort() because
+   BaseDriver.GetSSHPort() returns an (int, error), but err
+   is always hardcoded to nil. Want to use it to return the
+   port because it handles defaults already, but can't use it
+   "inline" because it's a multi-return Value
+*/
+func (d *Driver) getSSHPort() int {
+	port, _ := d.GetSSHPort()
+	return port
 }
 
 func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
@@ -170,6 +178,13 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		d.Transport = "https"
 	} else {
 		d.Transport = flags.String("rackhd-transport")
+	}
+
+	d.SSHKeyPath = flags.String("rackhd-ssh-key")
+	if d.SSHKeyPath != "" {
+		if _, err := os.Stat(d.SSHKeyPath); os.IsNotExist(err) {
+			return fmt.Errorf("SSH key does not exist: %q", d.SSHKeyPath)
+		}
 	}
 
 	return nil
@@ -208,9 +223,12 @@ func (d *Driver) PreCreateCheck() error {
 		if err != nil {
 			return err
 		}
+		log.Infof("Found a free node within SKU, Node ID: %v", d.NodeID)
 	}
 
-	log.Infof("Found a free node with SKU, Node ID: %v", d.NodeID)
+	if d.SSHKeyPath == "" {
+		log.Infof("No SSH Key specified. Will attempt login with user/pass and upload generated key pair")
+	}
 
 	return nil
 }
@@ -364,7 +382,7 @@ func (d *Driver) checkConnectivity(client *apiclientMonorail.Monorail) error {
 
 	// loop through slice and see if we can connect to the ip:ssh-port
 	for _, ipAddy := range ipAddSlice {
-		ipPort := ipAddy + ":" + strconv.Itoa(d.SSHPort)
+		ipPort := ipAddy + ":" + strconv.Itoa(d.getSSHPort())
 		log.Debugf("Testing connection to: %v", ipPort)
 		conn, err := net.DialTimeout("tcp", ipPort, 25000000000)
 		if err != nil {
@@ -381,31 +399,33 @@ func (d *Driver) checkConnectivity(client *apiclientMonorail.Monorail) error {
 		return fmt.Errorf("No IP addresses are accessible on this network to the Node ID specified. Error: %s", err)
 	}
 
-	//create public SSH key
-	log.Infof("Creating SSH key...")
-	key, err := d.createSSHKey()
-	if err != nil {
-		return err
-	}
-	d.SSHKey = strings.TrimSpace(key)
+	if d.SSHKeyPath == "" {
+		//create public SSH key
+		log.Infof("Creating SSH key...")
+		pubkey, err := d.createSSHKey()
+		if err != nil {
+			return err
+		}
+		pubkey = strings.TrimSpace(pubkey)
 
-	//TAKEN FROM THE FUSION DRIVER TO USE SSH [THANKS!]
-	log.Infof("Copy public SSH key to %s [%s]", d.MachineName, d.IPAddress)
-	// create .ssh folder in users home
-	if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.SSHUser), d); err != nil {
-		return err
-	}
-	// add public ssh key to authorized_keys
-	if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", d.SSHKey, d.SSHUser), d); err != nil {
-		return err
-	}
-	// make it secure
-	if err := executeSSHCommand(fmt.Sprintf("chmod 700 /home/%s/.ssh", d.SSHUser), d); err != nil {
-		return err
-	}
-	// make it secure
-	if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.SSHUser), d); err != nil {
-		return err
+		//TAKEN FROM THE FUSION DRIVER TO USE SSH [THANKS!]
+		log.Infof("Copying public SSH key to %s [%s]", d.MachineName, d.IPAddress)
+		// create .ssh folder in users home
+		if err := executeSSHCommand(fmt.Sprintf("mkdir -p /home/%s/.ssh", d.GetSSHUsername()), d); err != nil {
+			return err
+		}
+		// add public ssh key to authorized_keys
+		if err := executeSSHCommand(fmt.Sprintf("echo '%v' > /home/%s/.ssh/authorized_keys", pubkey, d.GetSSHUsername()), d); err != nil {
+			return err
+		}
+		// make it secure
+		if err := executeSSHCommand(fmt.Sprintf("chmod 700 /home/%s/.ssh", d.GetSSHUsername()), d); err != nil {
+			return err
+		}
+		// make it secure
+		if err := executeSSHCommand(fmt.Sprintf("chmod 600 /home/%s/.ssh/authorized_keys", d.GetSSHUsername()), d); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -440,13 +460,6 @@ func (d *Driver) lookupSkuByName(client *apiclientMonorail.Monorail) error {
 
 func (d *Driver) GetSSHHostname() (string, error) {
 	return d.GetIP()
-}
-
-func (d *Driver) GetSSHUsername() string {
-	if d.SSHUser == "" {
-		d.SSHUser = "root"
-	}
-	return d.SSHUser
 }
 
 func (d *Driver) createSSHKey() (string, error) {
@@ -740,13 +753,13 @@ func executeSSHCommand(command string, d *Driver) error {
 	log.Debugf("Execute executeSSHCommand: %s", command)
 
 	config := &cryptossh.ClientConfig{
-		User: d.SSHUser,
+		User: d.GetSSHUsername(),
 		Auth: []cryptossh.AuthMethod{
 			cryptossh.Password(d.SSHPassword),
 		},
 	}
 
-	client, err := cryptossh.Dial("tcp", fmt.Sprintf("%s:%d", d.IPAddress, d.SSHPort), config)
+	client, err := cryptossh.Dial("tcp", fmt.Sprintf("%s:%d", d.IPAddress, d.getSSHPort()), config)
 	if err != nil {
 		log.Debugf("Failed to dial:", err)
 		return err

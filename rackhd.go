@@ -194,11 +194,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SSHUser = flags.String("rackhd-ssh-user")
 	d.SSHPassword = flags.String("rackhd-ssh-password")
 	d.SSHPort = flags.Int("rackhd-ssh-port")
-	if d.SSHPort == 443 {
-		d.Transport = "https"
-	} else {
-		d.Transport = flags.String("rackhd-transport")
-	}
+	d.Transport = flags.String("rackhd-transport")
 
 	d.SSHKeyPath = flags.String("rackhd-ssh-key")
 	if d.SSHKeyPath != "" {

@@ -48,6 +48,8 @@ type Driver struct {
 	Transport      string
 	WFPollInterval int
 	WFTimeout      int
+	SSHAttempts    int
+	SSHTimeout     int
 	clientMonorail *apiclientMonorail.Monorail
 	clientRedfish  *apiclientRedfish.Redfish
 }
@@ -58,6 +60,8 @@ const (
 	defaultSSHPassword   = "root"
 	defaultWFPollIntSecs = 15
 	defaultWFTimeoutMins = 60
+	defaultSSHAttempts   = 10
+	defaultSSHTimeout    = 15
 )
 
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
@@ -129,6 +133,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "frequency in seconds to poll for status of active workflow",
 			Value:  defaultWFPollIntSecs,
 		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_SSH_ATTEMPTS",
+			Name:   "rackhd-ssh-attempts",
+			Usage:  "Number of times to try SSH to a new node",
+			Value:  defaultSSHAttempts,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_SSH_TIMEOUT",
+			Name:   "rackhd-ssh-timeout",
+			Usage:  "Number of seconds for SSH timeout",
+			Value:  defaultSSHTimeout,
+		},
 		/*
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
 			mcnflag.StringFlag{
@@ -147,6 +163,8 @@ func NewDriver(hostName, storePath string) *Driver {
 		Transport:      defaultTransport,
 		WFPollInterval: defaultWFPollIntSecs,
 		WFTimeout:      defaultWFTimeoutMins,
+		SSHAttempts:    defaultSSHAttempts,
+		SSHTimeout:     defaultSSHTimeout,
 		BaseDriver: &drivers.BaseDriver{
 			MachineName: hostName,
 			StorePath:   storePath,
@@ -205,6 +223,8 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.WFPollInterval = flags.Int("rackhd-workflow-poll")
 	d.WFTimeout = flags.Int("rackhd-workflow-timeout")
+	d.SSHAttempts = flags.Int("rackhd-ssh-attempts")
+	d.SSHTimeout = flags.Int("rackhd-ssh-timeout")
 
 	return nil
 }
@@ -403,13 +423,22 @@ func (d *Driver) checkConnectivity(client *apiclientMonorail.Monorail) error {
 	for _, ipAddy := range ipAddSlice {
 		ipPort := ipAddy + ":" + strconv.Itoa(d.getSSHPort())
 		log.Debugf("Testing connection to: %v", ipPort)
-		conn, err := net.DialTimeout("tcp", ipPort, 25000000000)
-		if err != nil {
-			log.Debugf("Connection failed on: %v", ipPort)
-		} else {
-			log.Infof("Connection succeeded on: %v", ipPort)
-			d.IPAddress = string(ipAddy)
-			conn.Close()
+		// Some Workflows (like InstallCoreOS) indicate finished *before* the OS
+		// is up and accessible. Therefore, we need to try a few times to see if
+		// SSH is ready for us.
+		for attempt := 0; attempt < d.SSHAttempts; attempt++ {
+			conn, err := net.Dial("tcp", ipPort)
+			if err != nil {
+				log.Debugf("Connection failed on: %v", ipPort)
+				time.Sleep(time.Duration(d.SSHTimeout) * time.Second)
+			} else {
+				log.Infof("Connection succeeded on: %v", ipPort)
+				d.IPAddress = string(ipAddy)
+				conn.Close()
+				break
+			}
+		}
+		if d.IPAddress != "" {
 			break
 		}
 	}

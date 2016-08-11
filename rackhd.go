@@ -46,14 +46,18 @@ type Driver struct {
 	WorkflowName   string
 	SSHPassword    string
 	Transport      string
+	WFPollInterval int
+	WFTimeout      int
 	clientMonorail *apiclientMonorail.Monorail
 	clientRedfish  *apiclientRedfish.Redfish
 }
 
 const (
-	defaultEndpoint    = "localhost:8080"
-	defaultTransport   = "http"
-	defaultSSHPassword = "root"
+	defaultEndpoint      = "localhost:8080"
+	defaultTransport     = "http"
+	defaultSSHPassword   = "root"
+	defaultWFPollIntSecs = 15
+	defaultWFTimeoutMins = 60
 )
 
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
@@ -111,6 +115,18 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "rackhd-ssh-key",
 			Usage:  "SSH private key path (if not provided, default SSH key will be used)",
 		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_WORKFLOW_TIMEOUT",
+			Name:   "rackhd-workflow-timeout",
+			Usage:  "max time in minutes to wait for workflow to finish",
+			Value:  defaultWFTimeoutMins,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_WORKFLOW_POLL",
+			Name:   "rackhd-workflow-poll",
+			Usage:  "frequency in seconds to poll for status of active workflow",
+			Value:  defaultWFPollIntSecs,
+		},
 		/*
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
 			mcnflag.StringFlag{
@@ -124,9 +140,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 
 func NewDriver(hostName, storePath string) *Driver {
 	return &Driver{
-		Endpoint:    defaultEndpoint,
-		SSHPassword: defaultSSHPassword,
-		Transport:   defaultTransport,
+		Endpoint:       defaultEndpoint,
+		SSHPassword:    defaultSSHPassword,
+		Transport:      defaultTransport,
+		WFPollInterval: defaultWFPollIntSecs,
+		WFTimeout:      defaultWFTimeoutMins,
 		BaseDriver: &drivers.BaseDriver{
 			MachineName: hostName,
 			StorePath:   storePath,
@@ -187,6 +205,9 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		}
 	}
 
+	d.WFPollInterval = flags.Int("rackhd-workflow-poll")
+	d.WFTimeout = flags.Int("rackhd-workflow-timeout")
+
 	return nil
 }
 
@@ -243,7 +264,7 @@ func (d *Driver) Create() error {
 			return err
 		}
 		log.Debugf("Workflow %s applied as instance id %s", d.WorkflowName, wfInstance)
-		err = d.waitForWorkflow(client, wfInstance, 60, 15)
+		err = d.waitForWorkflow(client, wfInstance, d.WFTimeout, d.WFPollInterval)
 		if err != nil {
 			return err
 		}

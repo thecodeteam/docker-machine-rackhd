@@ -46,14 +46,22 @@ type Driver struct {
 	WorkflowName   string
 	SSHPassword    string
 	Transport      string
+	WFPollInterval int
+	WFTimeout      int
+	SSHAttempts    int
+	SSHTimeout     int
 	clientMonorail *apiclientMonorail.Monorail
 	clientRedfish  *apiclientRedfish.Redfish
 }
 
 const (
-	defaultEndpoint    = "localhost:8080"
-	defaultTransport   = "http"
-	defaultSSHPassword = "root"
+	defaultEndpoint      = "localhost:8080"
+	defaultTransport     = "http"
+	defaultSSHPassword   = "root"
+	defaultWFPollIntSecs = 15
+	defaultWFTimeoutMins = 60
+	defaultSSHAttempts   = 10
+	defaultSSHTimeout    = 15
 )
 
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
@@ -87,29 +95,55 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_TRANSPORT",
 			Name:   "rackhd-transport",
-			Usage:  "RackHD Endpoint Transport. Specify http or https. HTTP is default",
+			Usage:  "RackHD Endpoint Transport. Specify http or https.",
 			Value:  defaultTransport,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_USER",
 			Name:   "rackhd-ssh-user",
-			Usage:  "ssh user (default:root)",
+			Usage:  "SSH user",
+			Value:  drivers.DefaultSSHUser,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_PASSWORD",
 			Name:   "rackhd-ssh-password",
-			Usage:  "ssh password (default:root)",
+			Usage:  "SSH password",
 			Value:  defaultSSHPassword,
 		},
 		mcnflag.IntFlag{
 			EnvVar: "RACKHD_SSH_PORT",
 			Name:   "rackhd-ssh-port",
-			Usage:  "ssh port (default:22)",
+			Usage:  "SSH port",
+			Value:  drivers.DefaultSSHPort,
 		},
 		mcnflag.StringFlag{
 			EnvVar: "RACKHD_SSH_KEY",
 			Name:   "rackhd-ssh-key",
 			Usage:  "SSH private key path (if not provided, default SSH key will be used)",
+		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_WORKFLOW_TIMEOUT",
+			Name:   "rackhd-workflow-timeout",
+			Usage:  "max time in minutes to wait for workflow to finish",
+			Value:  defaultWFTimeoutMins,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_WORKFLOW_POLL",
+			Name:   "rackhd-workflow-poll",
+			Usage:  "frequency in seconds to poll for status of active workflow",
+			Value:  defaultWFPollIntSecs,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_SSH_ATTEMPTS",
+			Name:   "rackhd-ssh-attempts",
+			Usage:  "Number of times to try SSH to a new node",
+			Value:  defaultSSHAttempts,
+		},
+		mcnflag.IntFlag{
+			EnvVar: "RACKHD_SSH_TIMEOUT",
+			Name:   "rackhd-ssh-timeout",
+			Usage:  "Number of seconds for SSH timeout",
+			Value:  defaultSSHTimeout,
 		},
 		/*
 			TODO: API Authentication Values. Will be detemined for v 2.0 of API
@@ -124,9 +158,13 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 
 func NewDriver(hostName, storePath string) *Driver {
 	return &Driver{
-		Endpoint:    defaultEndpoint,
-		SSHPassword: defaultSSHPassword,
-		Transport:   defaultTransport,
+		Endpoint:       defaultEndpoint,
+		SSHPassword:    defaultSSHPassword,
+		Transport:      defaultTransport,
+		WFPollInterval: defaultWFPollIntSecs,
+		WFTimeout:      defaultWFTimeoutMins,
+		SSHAttempts:    defaultSSHAttempts,
+		SSHTimeout:     defaultSSHTimeout,
 		BaseDriver: &drivers.BaseDriver{
 			MachineName: hostName,
 			StorePath:   storePath,
@@ -174,11 +212,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.SSHUser = flags.String("rackhd-ssh-user")
 	d.SSHPassword = flags.String("rackhd-ssh-password")
 	d.SSHPort = flags.Int("rackhd-ssh-port")
-	if d.SSHPort == 443 {
-		d.Transport = "https"
-	} else {
-		d.Transport = flags.String("rackhd-transport")
-	}
+	d.Transport = flags.String("rackhd-transport")
 
 	d.SSHKeyPath = flags.String("rackhd-ssh-key")
 	if d.SSHKeyPath != "" {
@@ -186,6 +220,11 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 			return fmt.Errorf("SSH key does not exist: %q", d.SSHKeyPath)
 		}
 	}
+
+	d.WFPollInterval = flags.Int("rackhd-workflow-poll")
+	d.WFTimeout = flags.Int("rackhd-workflow-timeout")
+	d.SSHAttempts = flags.Int("rackhd-ssh-attempts")
+	d.SSHTimeout = flags.Int("rackhd-ssh-timeout")
 
 	return nil
 }
@@ -243,7 +282,7 @@ func (d *Driver) Create() error {
 			return err
 		}
 		log.Debugf("Workflow %s applied as instance id %s", d.WorkflowName, wfInstance)
-		err = d.waitForWorkflow(client, wfInstance, 60, 15)
+		err = d.waitForWorkflow(client, wfInstance, d.WFTimeout, d.WFPollInterval)
 		if err != nil {
 			return err
 		}
@@ -384,13 +423,22 @@ func (d *Driver) checkConnectivity(client *apiclientMonorail.Monorail) error {
 	for _, ipAddy := range ipAddSlice {
 		ipPort := ipAddy + ":" + strconv.Itoa(d.getSSHPort())
 		log.Debugf("Testing connection to: %v", ipPort)
-		conn, err := net.DialTimeout("tcp", ipPort, 25000000000)
-		if err != nil {
-			log.Debugf("Connection failed on: %v", ipPort)
-		} else {
-			log.Infof("Connection succeeded on: %v", ipPort)
-			d.IPAddress = string(ipAddy)
-			conn.Close()
+		// Some Workflows (like InstallCoreOS) indicate finished *before* the OS
+		// is up and accessible. Therefore, we need to try a few times to see if
+		// SSH is ready for us.
+		for attempt := 0; attempt < d.SSHAttempts; attempt++ {
+			conn, err := net.Dial("tcp", ipPort)
+			if err != nil {
+				log.Debugf("Connection failed on: %v", ipPort)
+				time.Sleep(time.Duration(d.SSHTimeout) * time.Second)
+			} else {
+				log.Infof("Connection succeeded on: %v", ipPort)
+				d.IPAddress = string(ipAddy)
+				conn.Close()
+				break
+			}
+		}
+		if d.IPAddress != "" {
 			break
 		}
 	}

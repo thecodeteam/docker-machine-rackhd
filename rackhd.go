@@ -626,7 +626,7 @@ func (d *Driver) Stop() error {
 			return fmt.Errorf("OBM %#v Type Not Supported For Stopping: %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
-			resetType := "GracefulShutdown"
+			resetType := "ForceOff"
 			action := &modelsRedfish.RackHDResetActionResetAction{
 				ResetType: &resetType,
 			}
@@ -659,7 +659,7 @@ func (d *Driver) Remove() error {
 			log.Debugf("OBM %#v Type Not Supported For Shutdown: %#v", "noop-obm-service", d.NodeID)
 		default:
 			log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
-			resetType := "GracefulShutdown"
+			resetType := "ForceOff"
 			action := &modelsRedfish.RackHDResetActionResetAction{
 				ResetType: &resetType,
 			}

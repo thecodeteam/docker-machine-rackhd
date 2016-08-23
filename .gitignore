@@ -34,6 +34,3 @@ commands.md
 *.Darwin-x86_64
 *.Linux-x86_64
 *.Windows-x86_64
-
-# Glide
-glide.lock

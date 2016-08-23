@@ -4,11 +4,9 @@ import:
   subpackages:
   - client
   - models
-  vcs: git
-  ref: 83577fdb275678683da184ddda2856532bf197a9
+  version: 0.1.0
 - package: github.com/emccode/gorackhd-redfish
   subpackages:
   - client
   - models
-  vcs: git
   ref: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1

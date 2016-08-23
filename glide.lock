@@ -1,0 +1,118 @@
+hash: e234e9680c77dc850d6a8f8c461abc0cd1cf10fdaa07c3485d117217f0f7d215
+updated: 2016-08-23T10:23:46.760996891-07:00
+imports:
+- name: github.com/asaskevich/govalidator
+  version: 593d64559f7600f29581a3ee42177f5dbded27a9
+- name: github.com/docker/docker
+  version: a8a31eff10544860d2188dddabdee4d727545796
+  subpackages:
+  - pkg/term
+- name: github.com/docker/machine
+  version: e5298d1048245666773c9390f142c1fc44ad88c2
+  subpackages:
+  - libmachine/drivers
+  - libmachine/log
+  - libmachine/mcnflag
+  - libmachine/ssh
+  - libmachine/state
+  - libmachine/drivers/plugin
+  - libmachine/mcnutils
+  - libmachine/drivers/plugin/localbinary
+  - libmachine/drivers/rpc
+  - libmachine/version
+  - version
+- name: github.com/emccode/gorackhd
+  version: 3be2c6d3288611af98fb89db9ab1d60f74b0cbb4
+  subpackages:
+  - client
+  - models
+  - client/lookups
+  - client/nodes
+  - client/skus
+  - client/workflow
+  - client/catalog
+  - client/catalogs
+  - client/config
+  - client/delete
+  - client/dhcp
+  - client/files
+  - client/get
+  - client/identify
+  - client/obm
+  - client/obms
+  - client/patch
+  - client/pollers
+  - client/post
+  - client/profiles
+  - client/put
+  - client/tags
+  - client/task
+  - client/templates
+  - client/versions
+  - client/whitelist
+- name: github.com/emccode/gorackhd-redfish
+  version: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1
+  subpackages:
+  - client
+  - models
+  - client/redfish_v1
+- name: github.com/go-openapi/analysis
+  version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
+- name: github.com/go-openapi/errors
+  version: d24ebc2075bad502fac3a8ae27aa6dd58e1952dc
+- name: github.com/go-openapi/jsonpointer
+  version: 46af16f9f7b149af66e5d1bd010e3574dc06de98
+- name: github.com/go-openapi/jsonreference
+  version: 13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272
+- name: github.com/go-openapi/loads
+  version: 18441dfa706d924a39a030ee2c3b1d8d81917b38
+- name: github.com/go-openapi/runtime
+  version: 11e322eeecc1032d5a0a96c566ed53f2b5c26e22
+  subpackages:
+  - client
+- name: github.com/go-openapi/spec
+  version: 6aced65f8501fe1217321abf0749d354824ba2ff
+- name: github.com/go-openapi/strfmt
+  version: d65c7fdb29eca313476e529628176fe17e58c488
+- name: github.com/go-openapi/swag
+  version: 0e04f5e499b19bf51031c01a00f098f25067d8dc
+- name: github.com/go-openapi/validate
+  version: deaf2c9013bc1a7f4c774662259a506ba874d80f
+- name: github.com/go-swagger/go-swagger
+  version: 6b712512cbe1f1a4882354856b57c61d760499cc
+  vcs: git
+  subpackages:
+  - httpkit/client
+  - strfmt
+  - client
+  - errors
+  - httpkit
+  - httpkit/validate
+  - swag
+- name: github.com/mailru/easyjson
+  version: 34560e358dc05e2c28f6fda2f5c9e7494a4b9b19
+  subpackages:
+  - jlexer
+  - jwriter
+  - buffer
+- name: github.com/opennota/urlesc
+  version: 5fa9ff0392746aeae1c4b37fcc42c65afa7a9587
+  repo: https://github.com/opennota/urlesc
+- name: github.com/PuerkitoBio/purell
+  version: d69616f51cdfcd7514d6a380847a152dfc2a749d
+  repo: https://github.com/PuerkitoBio/purell
+- name: golang.org/x/crypto
+  version: beef0f4390813b96e8e68fd78570396d0f4751fc
+  subpackages:
+  - curve25519
+  - ssh
+  - ssh/terminal
+- name: golang.org/x/net
+  version: 4f2fc6c1e69d41baf187332ee08fbd2b296f21ed
+  subpackages:
+  - context
+  - context/ctxhttp
+- name: gopkg.in/yaml.v2
+  version: a83829b6f1293c91addabc89d0571c246397bbf4
+  repo: https://gopkg.in/yaml.v2
+devImports: []

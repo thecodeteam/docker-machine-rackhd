@@ -13,7 +13,6 @@ import (
 
 	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
 	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
-	modelsRedfish "github.com/emccode/gorackhd-redfish/models"
 	apiclientMonorail "github.com/emccode/gorackhd/client"
 	"github.com/emccode/gorackhd/client/lookups"
 	"github.com/emccode/gorackhd/client/nodes"
@@ -277,7 +276,7 @@ func (d *Driver) Create() error {
 	client := d.getClientMonorail()
 
 	if d.WorkflowName != "" {
-		wfInstance, err := d.applyWorkflow(client)
+		wfInstance, err := d.applyWorkflow(client, d.WorkflowName)
 		if err != nil {
 			return err
 		}
@@ -330,11 +329,11 @@ func (d *Driver) chooseNode(client *apiclientMonorail.Monorail) error {
 	return nil
 }
 
-func (d *Driver) applyWorkflow(client *apiclientMonorail.Monorail) (string, error) {
+func (d *Driver) applyWorkflow(client *apiclientMonorail.Monorail, wfName string) (string, error) {
 	// POST workflow to node
 	params := nodes.NewPostNodesIdentifierWorkflowsParams()
 	params.WithIdentifier(d.NodeID)
-	params.WithName(d.WorkflowName)
+	params.WithName(wfName)
 	resp, err := client.Nodes.PostNodesIdentifierWorkflows(params, nil)
 	if err != nil {
 		return "", err
@@ -577,154 +576,92 @@ func (d *Driver) GetState() (state.State, error) {
 }
 
 func (d *Driver) Start() error {
+	//Generate the client
+	client := d.getClientMonorail()
 
-	//Get the Out of Band Management Type
-	clientMonorail := d.getClientMonorail()
-	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
-	if errObm != nil {
-		return errObm
-	}
-
-	if len(respObm.Payload) > 0 {
-		//If there is no obm (such as Vagrant), nil
-		switch respObm.Payload[0].(map[string]interface{})["service"] {
-		case "noop-obm-service":
-			return fmt.Errorf("OBM %#v Type Not Supported For Starting: %#v", "noop-obm-service", d.NodeID)
-		default:
-			log.Debugf("Attempting Turn On: %#v", d.NodeID)
-			resetType := "On"
-			action := &modelsRedfish.RackHDResetActionResetAction{
-				ResetType: &resetType,
-			}
-
-			clientRedfish := d.getClientRedfish()
-
-			_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
-			if err != nil {
-				return fmt.Errorf("There was an issue Powering On the Server. Error: %s", err)
-			}
-
-			log.Debugf("Node has succussfully been powered on: %#v", d.NodeID)
-			return nil
+	log.Debugf("Attempting Power On of: %#v", d.NodeID)
+	err := d.obmAction(client, "Graph.PowerOn.Node")
+	if err != nil {
+		if err.Error() == "noop-obm-service" {
+			return fmt.Errorf("OBM %s Type Not Supported For Starting", "noop-obm-service")
+		} else {
+			return err
 		}
 	}
-	return fmt.Errorf("There was an issue Powering On the Server. No OBM detected")
+
+	log.Infof("Node has succussfully been Powered On: %#v", d.NodeID)
+	return nil
 }
 
 func (d *Driver) Stop() error {
-	//Get the Out of Band Management Type
-	clientMonorail := d.getClientMonorail()
-	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
-	if errObm != nil {
-		return errObm
-	}
+	//Generate the client
+	client := d.getClientMonorail()
 
-	if len(respObm.Payload) > 0 {
-		//If there is no obm (such as Vagrant), nil
-		switch respObm.Payload[0].(map[string]interface{})["service"] {
-		case "noop-obm-service":
-			return fmt.Errorf("OBM %#v Type Not Supported For Stopping: %#v", "noop-obm-service", d.NodeID)
-		default:
-			log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
-			resetType := "GracefulShutdown"
-			action := &modelsRedfish.RackHDResetActionResetAction{
-				ResetType: &resetType,
-			}
-
-			clientRedfish := d.getClientRedfish()
-
-			_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
-			if err != nil {
-				return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
-			}
-			log.Debugf("Node has succussfully been shutdown: %#v", d.NodeID)
-			return nil
+	log.Debugf("Attempting Shutdown of: %#v", d.NodeID)
+	err := d.obmAction(client, "Graph.PowerOff.Node")
+	if err != nil {
+		if err.Error() == "noop-obm-service" {
+			return fmt.Errorf("OBM %s Type Not Supported For Stopping", "noop-obm-service")
+		} else {
+			return err
 		}
 	}
-	return fmt.Errorf("There was an issue Shutting Down the Server. Error: No OBM detected")
+
+	log.Infof("Node has succussfully been Powered Off: %#v", d.NodeID)
+	return nil
 }
 
 func (d *Driver) Remove() error {
-	//Get the Out of Band Management Type
-	clientMonorail := d.getClientMonorail()
-	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
-	if errObm != nil {
-		return errObm
-	}
+	//Generate the client
+	client := d.getClientMonorail()
 
-	if len(respObm.Payload) > 0 {
-		//If there is no obm (such as Vagrant), nil
-		switch respObm.Payload[0].(map[string]interface{})["service"] {
-		case "noop-obm-service":
-			log.Debugf("OBM %#v Type Not Supported For Shutdown: %#v", "noop-obm-service", d.NodeID)
-		default:
-			log.Debugf("Attempting Graceful Shutdown of: %#v", d.NodeID)
-			resetType := "GracefulShutdown"
-			action := &modelsRedfish.RackHDResetActionResetAction{
-				ResetType: &resetType,
-			}
-
-			clientRedfish := d.getClientRedfish()
-
-			_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
-			if err != nil {
-				log.Infof("There was an issue Shutting Down the Server. Error: %s", err)
-				//return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
-			} else {
-				log.Debugf("Node has succussfully been shutdown: %#v", d.NodeID)
-			}
+	log.Debugf("Attempting Shutdown of: %#v", d.NodeID)
+	err := d.obmAction(client, "Graph.PowerOff.Node")
+	if err != nil {
+		if err.Error() == "noop-obm-service" {
+			log.Infof("OBM %s Type Not Supported For Stopping", "noop-obm-service")
+		} else {
+			log.Warnf("There was an issue Shutting Down the Server. Error: %s", err)
 		}
 	} else {
-		log.Infof("There was an issue Shutting Down the Server. Error: No OBM detected")
+		log.Infof("Node has succussfully been Powered Off: %#v", d.NodeID)
 	}
 
 	//Remove the Node from RackHD Inventory
 	log.Debugf("Removing Node From RackHD: %#v", d.NodeID)
-	_, err2 := clientMonorail.Nodes.DeleteNodesIdentifier(&nodes.DeleteNodesIdentifierParams{Identifier: d.NodeID}, nil)
-	if err2 != nil {
-		return err2
+	_, err = client.Nodes.DeleteNodesIdentifier(&nodes.DeleteNodesIdentifierParams{Identifier: d.NodeID}, nil)
+	if err != nil {
+		return err
 	}
-	log.Debugf("Successfully Removed Node From RackHD: %#v", d.NodeID)
+	log.Infof("Successfully Removed Node From RackHD: %#v", d.NodeID)
 
 	return nil
 }
 
 func (d *Driver) Restart() error {
-	//Get the Out of Band Management Type
-	clientMonorail := d.getClientMonorail()
-	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
-	if errObm != nil {
-		return errObm
-	}
+	//Generate the client
+	client := d.getClientMonorail()
 
-	if len(respObm.Payload) > 0 {
-		//If there is no obm (such as Vagrant), nil
-		switch respObm.Payload[0].(map[string]interface{})["service"] {
-		case "noop-obm-service":
-			return fmt.Errorf("OBM Type Not Supported: %#v, %#v", "noop-obm-service", d.NodeID)
-		default:
-			log.Debugf("Attempting Restart of: %#v", d.NodeID)
-			resetType := "GracefulRestart"
-			action := &modelsRedfish.RackHDResetActionResetAction{
-				ResetType: &resetType,
-			}
-
-			clientRedfish := d.getClientRedfish()
-
-			_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
-			if err != nil {
-				return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
-			}
-			log.Debugf("Successfully restarted node: %#v", d.NodeID)
-			return nil
+	log.Debugf("Attempting Restart of: %#v", d.NodeID)
+	err := d.obmAction(client, "Graph.Reboot.Node")
+	if err != nil {
+		if err.Error() == "noop-obm-service" {
+			return fmt.Errorf("OBM %s Type Not Supported For Restarting", "noop-obm-service")
+		} else {
+			return err
 		}
 	}
-	return fmt.Errorf("There was an issue Shutting Down the Server. Error: No OBM detected")
+
+	log.Infof("Node has succussfully been Restarted: %#v", d.NodeID)
+	return nil
 }
 
 func (d *Driver) Kill() error {
+	return d.Stop()
+}
+
+func (d *Driver) obmAction(clientMonorail *apiclientMonorail.Monorail, action string) error {
 	//Get the Out of Band Management Type
-	clientMonorail := d.getClientMonorail()
 	respObm, errObm := clientMonorail.Nodes.GetNodesIdentifierObm(&nodes.GetNodesIdentifierObmParams{Identifier: d.NodeID}, nil)
 	if errObm != nil {
 		return errObm
@@ -734,25 +671,21 @@ func (d *Driver) Kill() error {
 		//If there is no obm (such as Vagrant), nil
 		switch respObm.Payload[0].(map[string]interface{})["service"] {
 		case "noop-obm-service":
-			return fmt.Errorf("OBM Type Not Supported: %#v, %#v", "noop-obm-service", d.NodeID)
+			return fmt.Errorf("noop-obm-service")
 		default:
-			log.Debugf("Attempting Force Off of: %#v", d.NodeID)
-			resetType := "ForceOff"
-			action := &modelsRedfish.RackHDResetActionResetAction{
-				ResetType: &resetType,
-			}
-
-			clientRedfish := d.getClientRedfish()
-
-			_, err := clientRedfish.RedfishV1.DoReset(&redfish_v1.DoResetParams{Identifier: d.NodeID, Payload: action})
+			wfInstance, err := d.applyWorkflow(clientMonorail, action)
 			if err != nil {
-				return fmt.Errorf("There was an issue Shutting Down the Server. Error: %s", err)
+				return err
 			}
-			log.Debugf("Successfully turned off node: %#v", d.NodeID)
+			log.Debugf("Workflow %s applied as instance id %s", action, wfInstance)
+			err = d.waitForWorkflow(clientMonorail, wfInstance, 1, 10)
+			if err != nil {
+				return err
+			}
 			return nil
 		}
 	}
-	return fmt.Errorf("There was an issue Shutting Down the Server. Error: No OBM detected")
+	return fmt.Errorf("No OBM Detected")
 }
 
 func (d *Driver) tagNode(targetNode, targetTag string) error {

@@ -10,3 +10,5 @@ import:
   - client
   - models
   ref: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1
+- package: github.com/go-swagger/go-swagger
+  ref:     6b712512cbe1f1a4882354856b57c61d760499cc

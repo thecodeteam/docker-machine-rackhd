@@ -1,4 +1,4 @@
-# RackHD Driver for Docker Machine
+# RackHD Driver for Docker Machine [![Build Status](https://travis-ci.org/emccode/docker-machine-rackhd.svg?branch=master)](https://travis-ci.org/emccode/docker-machine-rackhd)
 
 Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and configuration of [Docker Swarm](https://github.com/docker/swarm) to a hardware agnostic server infrastructure.
 

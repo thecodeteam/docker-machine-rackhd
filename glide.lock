@@ -1,35 +1,35 @@
-hash: e234e9680c77dc850d6a8f8c461abc0cd1cf10fdaa07c3485d117217f0f7d215
-updated: 2016-08-23T10:23:46.760996891-07:00
+hash: f4b32c91535e654ed2425c659d96106cf1a0e2d88108caedf9e2744145ebdbf2
+updated: 2016-08-24T11:20:19.733401223-07:00
 imports:
 - name: github.com/asaskevich/govalidator
   version: 593d64559f7600f29581a3ee42177f5dbded27a9
+- name: github.com/Azure/go-ansiterm
+  version: fa152c58bc15761d0200cb75fe958b89a9d4888e
+  subpackages:
+  - winterm
 - name: github.com/docker/docker
-  version: a8a31eff10544860d2188dddabdee4d727545796
+  version: 4a1b048c1539ca67c8be5fd3d12fe10f65ee600e
   subpackages:
   - pkg/term
+  - pkg/term/windows
 - name: github.com/docker/machine
-  version: e5298d1048245666773c9390f142c1fc44ad88c2
+  version: b0927fb52fe4af975d0aa27a8e027976bc37635b
   subpackages:
   - libmachine/drivers
-  - libmachine/log
-  - libmachine/mcnflag
-  - libmachine/ssh
-  - libmachine/state
   - libmachine/drivers/plugin
-  - libmachine/mcnutils
   - libmachine/drivers/plugin/localbinary
   - libmachine/drivers/rpc
+  - libmachine/log
+  - libmachine/mcnflag
+  - libmachine/mcnutils
+  - libmachine/ssh
+  - libmachine/state
   - libmachine/version
   - version
 - name: github.com/emccode/gorackhd
   version: 3be2c6d3288611af98fb89db9ab1d60f74b0cbb4
   subpackages:
   - client
-  - models
-  - client/lookups
-  - client/nodes
-  - client/skus
-  - client/workflow
   - client/catalog
   - client/catalogs
   - client/config
@@ -38,6 +38,8 @@ imports:
   - client/files
   - client/get
   - client/identify
+  - client/lookups
+  - client/nodes
   - client/obm
   - client/obms
   - client/patch
@@ -45,17 +47,20 @@ imports:
   - client/post
   - client/profiles
   - client/put
+  - client/skus
   - client/tags
   - client/task
   - client/templates
   - client/versions
   - client/whitelist
+  - client/workflow
+  - models
 - name: github.com/emccode/gorackhd-redfish
   version: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1
   subpackages:
   - client
-  - models
   - client/redfish_v1
+  - models
 - name: github.com/go-openapi/analysis
   version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
 - name: github.com/go-openapi/errors
@@ -80,39 +85,69 @@ imports:
   version: deaf2c9013bc1a7f4c774662259a506ba874d80f
 - name: github.com/go-swagger/go-swagger
   version: 6b712512cbe1f1a4882354856b57c61d760499cc
-  vcs: git
   subpackages:
-  - httpkit/client
-  - strfmt
   - client
   - errors
   - httpkit
+  - httpkit/client
   - httpkit/validate
+  - strfmt
   - swag
 - name: github.com/mailru/easyjson
   version: 34560e358dc05e2c28f6fda2f5c9e7494a4b9b19
   subpackages:
+  - buffer
   - jlexer
   - jwriter
-  - buffer
-- name: github.com/opennota/urlesc
-  version: 5fa9ff0392746aeae1c4b37fcc42c65afa7a9587
-  repo: https://github.com/opennota/urlesc
 - name: github.com/PuerkitoBio/purell
-  version: d69616f51cdfcd7514d6a380847a152dfc2a749d
-  repo: https://github.com/PuerkitoBio/purell
+  version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
+- name: github.com/PuerkitoBio/urlesc
+  version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/Sirupsen/logrus
+  version: 08a8a7c27e3d058a8989316a850daad1c10bf4ab
 - name: golang.org/x/crypto
-  version: beef0f4390813b96e8e68fd78570396d0f4751fc
+  version: 351dc6a5bf92a5f2ae22fadeee08eb6a45aa2d93
   subpackages:
   - curve25519
+  - ed25519
+  - ed25519/internal/edwards25519
   - ssh
   - ssh/terminal
 - name: golang.org/x/net
-  version: 4f2fc6c1e69d41baf187332ee08fbd2b296f21ed
+  version: 7394c112eae4dba7e96bfcfe738e6373d61772b4
   subpackages:
   - context
   - context/ctxhttp
+  - idna
+- name: golang.org/x/sys
+  version: a646d33e2ee3172a661fc09bca23bb4889a41bc8
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: d69c40b4be55797923cec7457fac7a244d91a9b6
+  subpackages:
+  - cases
+  - internal/tag
+  - language
+  - runes
+  - secure/bidirule
+  - secure/precis
+  - transform
+  - unicode/bidi
+  - unicode/norm
+  - width
 - name: gopkg.in/yaml.v2
-  version: a83829b6f1293c91addabc89d0571c246397bbf4
-  repo: https://gopkg.in/yaml.v2
-devImports: []
+  version: e4d366fc3c7938e2958e662b4258c7a89e1f0e3e
+testImports:
+- name: github.com/davecgh/go-spew
+  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  subpackages:
+  - spew
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
+- name: github.com/stretchr/testify
+  version: d77da356e56a7428ad25149ca77381849a6a5232
+  subpackages:
+  - assert

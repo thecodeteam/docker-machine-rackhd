@@ -1,8 +1,8 @@
-# RackHD Driver for Docker Machine [![Build Status](https://travis-ci.org/emccode/docker-machine-rackhd.svg?branch=master)](https://travis-ci.org/emccode/docker-machine-rackhd)
+# RackHD Machine Driver [![Build Status](https://travis-ci.org/emccode/docker-machine-rackhd.svg?branch=master)](https://travis-ci.org/emccode/docker-machine-rackhd)
 
 Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and configuration of [Docker Swarm](https://github.com/docker/swarm) to a hardware agnostic server infrastructure.
 
-RackHD Driver for Docker Machine increases efficiency by using RackHD APIs to drive automation for all compatible hardware. This entirely new solution differs from other available drivers that are focused on automating virtual machines or proprietary stacks, and allows users to capture all the robust benefits such as increased application performance and reduced management complexity by removing the hypervisor layer.
+RackHD Machine Driver increases efficiency by using RackHD APIs to drive automation for all compatible hardware. This entirely new solution differs from other available drivers that are focused on automating virtual machines or proprietary stacks, and allows users to capture all the robust benefits such as increased application performance and reduced management complexity by removing the hypervisor layer.
 
 ## Installation
 
@@ -111,7 +111,7 @@ Note that when using a workflow to install an OS, it takes many minutes to do th
 
 Check out the [RackHD Vagrant + Docker Machine Example](https://github.com/emccode/machine/tree/master/rackhd) to view a complete in-depth configuration and walk-through.
 
-[![Docker Machine Driver for RackHD Vagrant Setup and Testing](http://i.imgur.com/346xWSZ.png)](https://github.com/emccode/machine/tree/master/rackhd "Docker Machine Driver for RackHD Vagrant Setup and Testing")
+[![Docker Machine Driver for RackHD Vagrant Setup and Testing](http://i.imgur.com/346xWSZ.png)](https://github.com/emccode/machine/tree/master/rackhd "RackHD Machine Driver Vagrant Setup and Testing")
 
 ## Docker Machine Functions
 

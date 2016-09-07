@@ -11,21 +11,17 @@ import (
 	"strings"
 	"time"
 
-	apiclientRedfish "github.com/emccode/gorackhd-redfish/client"
-	"github.com/emccode/gorackhd-redfish/client/redfish_v1"
-	apiclientMonorail "github.com/emccode/gorackhd/client"
-	"github.com/emccode/gorackhd/client/lookups"
-	"github.com/emccode/gorackhd/client/nodes"
-	"github.com/emccode/gorackhd/client/skus"
-	"github.com/emccode/gorackhd/client/workflow"
-	modelsMonorail "github.com/emccode/gorackhd/models"
+	apiclientRedfish "github.com/codedellemc/gorackhd-redfish/client"
+	"github.com/codedellemc/gorackhd-redfish/client/redfish_v1"
+	apiclientMonorail "github.com/codedellemc/gorackhd/client"
+	"github.com/codedellemc/gorackhd/client/lookups"
+	"github.com/codedellemc/gorackhd/client/nodes"
+	"github.com/codedellemc/gorackhd/client/skus"
+	"github.com/codedellemc/gorackhd/client/workflow"
+	modelsMonorail "github.com/codedellemc/gorackhd/models"
 
-	// Need the *old* style libraries for redfish
-	red_httptransport "github.com/go-swagger/go-swagger/httpkit/client"
-	red_strfmt "github.com/go-swagger/go-swagger/strfmt"
-
-	mono_httptransport "github.com/go-openapi/runtime/client"
-	mono_strfmt "github.com/go-openapi/strfmt"
+	httptransport "github.com/go-openapi/runtime/client"
+	"github.com/go-openapi/strfmt"
 
 	"github.com/docker/machine/libmachine/drivers"
 	"github.com/docker/machine/libmachine/log"
@@ -366,15 +362,10 @@ func (d *Driver) waitForWorkflow(client *apiclientMonorail.Monorail, wfInstance 
 				return err
 			}
 
-			var status interface{}
-			status, err = getRootLevelVal(resp.Payload.(map[string]interface{}), "_status")
-			if err != nil {
-				return err
-			}
-			if status.(string) == "succeeded" {
+			if resp.Payload.Status == "succeeded" {
 				log.Debugf("Worklow successful!")
 				return nil
-			} else if status.(string) != "running" {
+			} else if resp.Payload.Status != "running" {
 				return fmt.Errorf("Workflow appears to have failed")
 			}
 		}
@@ -707,9 +698,9 @@ func (d *Driver) getClientMonorail() *apiclientMonorail.Monorail {
 	if d.clientMonorail == nil {
 		// create the transport
 		/** Will Need to determine changes for v 2.0 API **/
-		transport := mono_httptransport.New(d.Endpoint, "/api/1.1", []string{d.Transport})
+		transport := httptransport.New(d.Endpoint, "/api/1.1", []string{d.Transport})
 		// create the API client, with the transport
-		d.clientMonorail = apiclientMonorail.New(transport, mono_strfmt.Default)
+		d.clientMonorail = apiclientMonorail.New(transport, strfmt.Default)
 	}
 	return d.clientMonorail
 }
@@ -718,9 +709,9 @@ func (d *Driver) getClientRedfish() *apiclientRedfish.Redfish {
 	log.Debugf("Getting RackHD Redfish Client")
 	if d.clientRedfish == nil {
 		// create the transport
-		transport := red_httptransport.New(d.Endpoint, "/redfish/v1", []string{d.Transport})
+		transport := httptransport.New(d.Endpoint, "/redfish/v1", []string{d.Transport})
 		// create the API client, with the transport
-		d.clientRedfish = apiclientRedfish.New(transport, red_strfmt.Default)
+		d.clientRedfish = apiclientRedfish.New(transport, strfmt.Default)
 	}
 	return d.clientRedfish
 }

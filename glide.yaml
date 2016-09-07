@@ -1,14 +1,10 @@
-package: github.com/emccode/docker-machine-rackhd
+package: github.com/codedellemc/docker-machine-rackhd
 import:
-- package: github.com/emccode/gorackhd
+- package: github.com/codedellemc/gorackhd
   subpackages:
   - client
   - models
-  version: 0.1.0
-- package: github.com/emccode/gorackhd-redfish
+- package: github.com/codedellemc/gorackhd-redfish
   subpackages:
   - client
   - models
-  ref: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1
-- package: github.com/go-swagger/go-swagger
-  ref:     6b712512cbe1f1a4882354856b57c61d760499cc

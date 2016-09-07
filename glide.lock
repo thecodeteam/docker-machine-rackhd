@@ -1,33 +1,14 @@
-hash: f4b32c91535e654ed2425c659d96106cf1a0e2d88108caedf9e2744145ebdbf2
-updated: 2016-08-24T11:20:19.733401223-07:00
+hash: be8718c4ede4a901308961781d8ca7789855687086efcff2a6d5d3ec41690964
+updated: 2016-09-07T13:01:12.299657802-07:00
 imports:
 - name: github.com/asaskevich/govalidator
-  version: 593d64559f7600f29581a3ee42177f5dbded27a9
+  version: df81827fdd59d8b4fb93d8910b286ab7a3919520
 - name: github.com/Azure/go-ansiterm
   version: fa152c58bc15761d0200cb75fe958b89a9d4888e
   subpackages:
   - winterm
-- name: github.com/docker/docker
-  version: 4a1b048c1539ca67c8be5fd3d12fe10f65ee600e
-  subpackages:
-  - pkg/term
-  - pkg/term/windows
-- name: github.com/docker/machine
-  version: b0927fb52fe4af975d0aa27a8e027976bc37635b
-  subpackages:
-  - libmachine/drivers
-  - libmachine/drivers/plugin
-  - libmachine/drivers/plugin/localbinary
-  - libmachine/drivers/rpc
-  - libmachine/log
-  - libmachine/mcnflag
-  - libmachine/mcnutils
-  - libmachine/ssh
-  - libmachine/state
-  - libmachine/version
-  - version
-- name: github.com/emccode/gorackhd
-  version: 3be2c6d3288611af98fb89db9ab1d60f74b0cbb4
+- name: github.com/codedellemc/gorackhd
+  version: 92f5e99ea8af0d4afbd96ba3573bd0405be28975
   subpackages:
   - client
   - client/catalog
@@ -55,58 +36,61 @@ imports:
   - client/whitelist
   - client/workflow
   - models
-- name: github.com/emccode/gorackhd-redfish
-  version: 43ab31a6dcfc93752b4e779d2bd91570f78c44a1
+- name: github.com/codedellemc/gorackhd-redfish
+  version: 28d920bc3f0fc3b73fe6323b7901e750908acbab
   subpackages:
   - client
   - client/redfish_v1
   - models
+- name: github.com/docker/docker
+  version: 426a0af0759798d8e3332b38236ee40df6d14798
+  subpackages:
+  - pkg/term
+  - pkg/term/windows
+- name: github.com/docker/machine
+  version: 2aed8d9349e2b3d5d3b7d3e6362d0e4782de402e
+  subpackages:
+  - libmachine/drivers
+  - libmachine/drivers/plugin
+  - libmachine/drivers/plugin/localbinary
+  - libmachine/drivers/rpc
+  - libmachine/log
+  - libmachine/mcnflag
+  - libmachine/mcnutils
+  - libmachine/ssh
+  - libmachine/state
+  - libmachine/version
+  - version
 - name: github.com/go-openapi/analysis
-  version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
+  version: 5a8fe2138f95138797c306c07e65e759c55f898f
 - name: github.com/go-openapi/errors
-  version: d24ebc2075bad502fac3a8ae27aa6dd58e1952dc
+  version: 8a4ac38004d8cdb96dac7bece88034dd3d94493f
 - name: github.com/go-openapi/jsonpointer
-  version: 46af16f9f7b149af66e5d1bd010e3574dc06de98
+  version: f5133566e18f23f2085d953998fd72959b698623
 - name: github.com/go-openapi/jsonreference
-  version: 13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272
+  version: 44d0c05f81b60f99eeb8c188b8983ec82e5d872f
 - name: github.com/go-openapi/loads
-  version: 18441dfa706d924a39a030ee2c3b1d8d81917b38
+  version: 3a4490f96e6ea1ba7d66602e70ffca0fc26aa6ca
 - name: github.com/go-openapi/runtime
-  version: 11e322eeecc1032d5a0a96c566ed53f2b5c26e22
+  version: b12d766cb7ccfdac98c946f9f0ab4afa8c6aeadc
   subpackages:
   - client
 - name: github.com/go-openapi/spec
-  version: 6aced65f8501fe1217321abf0749d354824ba2ff
+  version: 2029f5179022b7e840b71a663b1fda7fb24e49a0
 - name: github.com/go-openapi/strfmt
-  version: d65c7fdb29eca313476e529628176fe17e58c488
+  version: 66a99d45c3043d45d346b1c8db5dc2f76a004869
 - name: github.com/go-openapi/swag
-  version: 0e04f5e499b19bf51031c01a00f098f25067d8dc
+  version: f8ab07bb33bb43a743eb65daf0588ab522e5160f
 - name: github.com/go-openapi/validate
-  version: deaf2c9013bc1a7f4c774662259a506ba874d80f
-- name: github.com/go-swagger/go-swagger
-  version: 6b712512cbe1f1a4882354856b57c61d760499cc
-  subpackages:
-  - client
-  - errors
-  - httpkit
-  - httpkit/client
-  - httpkit/validate
-  - strfmt
-  - swag
-- name: github.com/mailru/easyjson
-  version: 34560e358dc05e2c28f6fda2f5c9e7494a4b9b19
-  subpackages:
-  - buffer
-  - jlexer
-  - jwriter
+  version: 14872542e3bd537d6d6b9976e066ff658d41975f
+- name: github.com/opennota/urlesc
+  version: 5fa9ff0392746aeae1c4b37fcc42c65afa7a9587
 - name: github.com/PuerkitoBio/purell
-  version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
-- name: github.com/PuerkitoBio/urlesc
-  version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+  version: d69616f51cdfcd7514d6a380847a152dfc2a749d
 - name: github.com/Sirupsen/logrus
-  version: 08a8a7c27e3d058a8989316a850daad1c10bf4ab
+  version: 3ec0642a7fb6488f65b06f9040adc67e3990296a
 - name: golang.org/x/crypto
-  version: 351dc6a5bf92a5f2ae22fadeee08eb6a45aa2d93
+  version: 9e590154d2353f3f5e1b24da7275686040dcf491
   subpackages:
   - curve25519
   - ed25519
@@ -114,33 +98,17 @@ imports:
   - ssh
   - ssh/terminal
 - name: golang.org/x/net
-  version: 7394c112eae4dba7e96bfcfe738e6373d61772b4
+  version: 9313baa13d9262e49d07b20ed57dceafcd7240cc
   subpackages:
   - context
   - context/ctxhttp
-  - idna
 - name: golang.org/x/sys
-  version: a646d33e2ee3172a661fc09bca23bb4889a41bc8
+  version: 30de6d19a3bd89a5f38ae4028e23aaa5582648af
   subpackages:
   - unix
-- name: golang.org/x/text
-  version: d69c40b4be55797923cec7457fac7a244d91a9b6
-  subpackages:
-  - cases
-  - internal/tag
-  - language
-  - runes
-  - secure/bidirule
-  - secure/precis
-  - transform
-  - unicode/bidi
-  - unicode/norm
-  - width
-- name: gopkg.in/yaml.v2
-  version: e4d366fc3c7938e2958e662b4258c7a89e1f0e3e
 testImports:
 - name: github.com/davecgh/go-spew
-  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  version: 66f99a29a08158b999b0dc2e7ccacf1131d4e0b4
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib

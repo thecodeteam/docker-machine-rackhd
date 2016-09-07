@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/codedellemc/docker-machine-rackhd"
 	"github.com/docker/machine/libmachine/drivers/plugin"
-	"github.com/emccode/docker-machine-rackhd"
 )
 
 func main() {

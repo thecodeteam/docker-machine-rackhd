@@ -1,4 +1,4 @@
-# RackHD Machine Driver [![Build Status](https://travis-ci.org/emccode/docker-machine-rackhd.svg?branch=master)](https://travis-ci.org/emccode/docker-machine-rackhd)
+# RackHD Machine Driver [![Build Status](https://travis-ci.org/codedellemc/docker-machine-rackhd.svg?branch=master)](https://travis-ci.org/codedellemc/docker-machine-rackhd)
 
 Use [Docker Machine](https://github.com/docker/machine) to create Docker hosts with [RackHD](https://github.com/RackHD/RackHD). This is the first solution that enables bare-metal provisioning of [Docker](https://github.com/docker/docker) and configuration of [Docker Swarm](https://github.com/docker/swarm) to a hardware agnostic server infrastructure.
 
@@ -8,7 +8,7 @@ RackHD Machine Driver increases efficiency by using RackHD APIs to drive automat
 
 **Linux & Mac OSX**:
 ```
-curl -L https://github.com/emccode/docker-machine-rackhd/releases/download/v0.2.0/docker-machine-driver-rackhd.`uname -s`-`uname -m` >/usr/local/bin/docker-machine-driver-rackhd &&  chmod +x /usr/local/bin/docker-machine-driver-rackhd
+curl -L https://github.com/codedellemc/docker-machine-rackhd/releases/download/v0.2.0/docker-machine-driver-rackhd.`uname -s`-`uname -m` >/usr/local/bin/docker-machine-driver-rackhd &&  chmod +x /usr/local/bin/docker-machine-driver-rackhd
 ```
 
 ## Using the driver
@@ -109,9 +109,9 @@ Note that when using a workflow to install an OS, it takes many minutes to do th
 
 ---
 
-Check out the [RackHD Vagrant + Docker Machine Example](https://github.com/emccode/machine/tree/master/rackhd) to view a complete in-depth configuration and walk-through.
+Check out the [RackHD Vagrant + Docker Machine Example](https://github.com/codedellemc/machine/tree/master/rackhd) to view a complete in-depth configuration and walk-through.
 
-[![Docker Machine Driver for RackHD Vagrant Setup and Testing](http://i.imgur.com/346xWSZ.png)](https://github.com/emccode/machine/tree/master/rackhd "RackHD Machine Driver Vagrant Setup and Testing")
+[![Docker Machine Driver for RackHD Vagrant Setup and Testing](http://i.imgur.com/346xWSZ.png)](https://github.com/codedellemc/machine/tree/master/rackhd "RackHD Machine Driver Vagrant Setup and Testing")
 
 ## Docker Machine Functions
 
@@ -123,4 +123,4 @@ Licensed under the Apache License, Version 2.0 (the “License”); you may not 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 # Support
-If you have questions relating to the project, please either post [Github Issues](https://github.com/emccode/docker-machine-driver-rackhd/issues), join our Slack channel available by signup through [community.emc.com](https://community.emccode.com) and post questions into `#support`, or reach out to the maintainers directly.  The code and documentation are released with no warranties or SLAs and are intended to be supported through a community driven process.
+If you have questions relating to the project, please either post [Github Issues](https://github.com/codedellemc/docker-machine-rackhd/issues), join our Slack channel available by signup through [community.emc.com](https://community.codedellemc.com) and post questions into `#support`, or reach out to the maintainers directly.  The code and documentation are released with no warranties or SLAs and are intended to be supported through a community driven process.
